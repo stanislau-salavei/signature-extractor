@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import tkinter as tk
+import tkinter.font as tkfont
 
 from signature_extractor.ui.fonts import family, ui_scale
 from signature_extractor.ui.popup import BorderlessPopup
@@ -63,18 +64,23 @@ class OverflowMenu:
 
         radius = px(8)
         margin = px(16)
-        row_h = px(36)
-        pad = px(6)
-        border = max(1, px(1))
-        card_w = px(228)
+        row_h = px(40)
+        # Hover fill sits 4 px in from the menu edges. Rows themselves are the 40 px step.
+        edge = px(4)
         icon_px = px(16)
-        item_pad = px(12)
+        icon_x = px(14)
         icon_gap = px(12)
+        text_right = px(24)
         sep_margin_y = px(4)
         sep_margin_x = px(8)
         sep_h = max(1, px(1))
         has_sep = len(self._commands) > 2
-        card_h = border * 2 + pad * 2 + len(self._commands) * row_h
+        has_icon = any(icon for _label, icon, _command in self._commands)
+        measure = tkfont.Font(family=family(), size=-px(14))
+        text_w = max((measure.measure(label) for label, _icon, _command in self._commands), default=px(40))
+        icon_block = icon_px + icon_gap if has_icon else 0
+        card_w = icon_x + icon_block + text_w + text_right
+        card_h = edge + len(self._commands) * row_h + edge
         if has_sep:
             card_h += sep_margin_y * 2 + sep_h
         self.card_size = (card_w, card_h)
@@ -91,34 +97,42 @@ class OverflowMenu:
         _paint_flyout(canvas, margin, margin, card_w, card_h, radius, palette.menu_bg, palette.menu_border, outside)
 
         self._photos = []
-        y = margin + border + pad
-        origin_x = margin + border + pad
-        item_w = card_w - border * 2 - pad * 2
+        y = margin + edge
         for index, (label, icon_name, command) in enumerate(self._commands):
             if has_sep and index == 2:
                 sep_y = y + sep_margin_y
                 canvas.create_line(
-                    margin + border + sep_margin_x,
+                    margin + sep_margin_x,
                     sep_y,
-                    margin + card_w - border - sep_margin_x,
+                    margin + card_w - sep_margin_x,
                     sep_y,
                     fill=palette.divider,
                     width=sep_h,
                 )
                 y += sep_margin_y * 2 + sep_h
-            tag = f"item{index}"
-            _round_rect(canvas, origin_x, y, item_w, row_h, px(4), palette.menu_bg, tags=(tag, "hit"))
-            text_x = origin_x + item_pad
+            hit = f"item{index}"
+            plate = f"plate{index}"
+            _round_rect(
+                canvas,
+                margin + edge,
+                y + px(2),
+                card_w - edge * 2,
+                row_h - px(4),
+                px(4),
+                palette.menu_bg,
+                tags=(plate,),
+            )
+            text_x = margin + icon_x
             if icon_name:
                 photo = svg_photo(canvas, icon_name, icon_px, palette.text)
                 self._photos.append(photo)
                 canvas.create_image(
-                    origin_x + item_pad + icon_px // 2,
+                    margin + icon_x + icon_px // 2,
                     y + row_h // 2,
                     image=photo,
-                    tags=(tag, "hit"),
+                    tags=(hit,),
                 )
-                text_x = origin_x + item_pad + icon_px + icon_gap
+                text_x = margin + icon_x + icon_px + icon_gap
             canvas.create_text(
                 text_x,
                 y + row_h // 2,
@@ -126,11 +140,14 @@ class OverflowMenu:
                 anchor="w",
                 fill=palette.text,
                 font=_menu_font(px(14)),
-                tags=(tag, "hit"),
+                tags=(hit,),
             )
-            canvas.tag_bind(tag, "<Enter>", lambda _event, t=tag: self._hover(t, True))
-            canvas.tag_bind(tag, "<Leave>", lambda _event, t=tag: self._hover(t, False))
-            canvas.tag_bind(tag, "<Button-1>", lambda _event, cmd=command: self._activate(cmd))
+            canvas.tag_bind(hit, "<Enter>", lambda _event, p=plate: self._hover(p, True))
+            canvas.tag_bind(hit, "<Leave>", lambda _event, p=plate: self._hover(p, False))
+            canvas.tag_bind(hit, "<Button-1>", lambda _event, cmd=command: self._activate(cmd))
+            canvas.tag_bind(plate, "<Enter>", lambda _event, p=plate: self._hover(p, True))
+            canvas.tag_bind(plate, "<Leave>", lambda _event, p=plate: self._hover(p, False))
+            canvas.tag_bind(plate, "<Button-1>", lambda _event, cmd=command: self._activate(cmd))
             y += row_h
 
         self._canvas = canvas

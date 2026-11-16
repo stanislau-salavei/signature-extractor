@@ -12,7 +12,7 @@ from PIL import Image, ImageTk
 
 from signature_extractor import __version__
 from signature_extractor.controller.state import AppController
-from signature_extractor.paths import app_icon_path, license_path
+from signature_extractor.paths import app_icon_path
 from signature_extractor.ui.svg_icons import svg_image
 from signature_extractor.ui.popup import BorderlessPopup
 from signature_extractor.ui.pages.help_page import HelpPage
@@ -130,6 +130,9 @@ class MainWindow(ctk.CTk):
         )
         self.menu.hide()
         self.import_page.refresh_chrome()
+        from signature_extractor.ui.caption import apply_titlebar
+
+        self.after(50, lambda: apply_titlebar(self))
 
     def _show_page(self, page: str) -> None:
         for widget in (
@@ -226,8 +229,7 @@ class MainWindow(ctk.CTk):
             elif kind == "notes":
                 self.open_url(URL_RELEASE_NOTES)
             elif kind == "license":
-                path = license_path()
-                self.open_url(path.as_uri() if path is not None else URL_GPL)
+                self.open_url(URL_GPL)
 
         AboutDialog(self, self.controller.text, __version__, close, url, lambda: self.open_url(URL_ISSUES))
 
@@ -291,6 +293,9 @@ class MainWindow(ctk.CTk):
         if mode != self._seen_mode:
             self._seen_mode = mode
             self.import_page.refresh_chrome()
+            from signature_extractor.ui.caption import apply_titlebar
+
+            apply_titlebar(self)
         self.after(250, self._watch_theme)
 
     def _center(self) -> None:

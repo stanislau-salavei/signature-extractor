@@ -37,7 +37,13 @@ class ThinScroll(ctk.CTkFrame):
         # window colour explicitly so dark mode stays #202020.
         self.content = ctk.CTkFrame(self.canvas, fg_color=pair("bg"), bg_color=pair("bg"))
         self._window = self.canvas.create_window((0, 0), window=self.content, anchor="nw")
-        self.bar = tk.Canvas(self, width=8, highlightthickness=0, bd=0, bg=palette.bg)
+        self.bar = tk.Canvas(self, width=12, highlightthickness=0, bd=0, bg=palette.bg, cursor="arrow")
+        self._thumb_px = 2
+        self._thumb_target = 2
+        self._anim: str | None = None
+        self.bar.bind("<Enter>", lambda _event: self._aim(6))
+        self.bar.bind("<Leave>", lambda _event: self._aim(2))
+        self.bar.bind("<Button-1>", self._on_bar_click)
         self.content.bind("<Configure>", self._on_content)
         self.canvas.bind("<Configure>", self._on_canvas)
         self.canvas.bind("<MouseWheel>", self._on_wheel, add="+")
@@ -115,12 +121,10 @@ class ThinScroll(ctk.CTkFrame):
             return
         first, last = self.canvas.yview()
         span = max(last - first, 0.05)
-        # Track is inset 8 px from the scroll top and bottom. Thumb is 5 px
-        # wide and sits 6 px from the window edge (3 px inside a 12 px track).
         inset = 8
         track_h = max(view_h - inset * 2, 1)
         thumb_h = max(28, int(track_h * span))
-        thumb_h = min(thumb_h, track_h)
+        thumb_h = min(thumb_h, max(track_h - 4, 8))
         travel = max(track_h - thumb_h, 1)
         thumb_y = int(first / max(1 - span, 0.001) * travel) if last < 0.999 else track_h - thumb_h
         thumb_y = max(0, min(thumb_y, track_h - thumb_h))
@@ -128,13 +132,59 @@ class ThinScroll(ctk.CTkFrame):
         self.bar.configure(bg=palette.bg)
         self.bar.place(relx=1.0, y=inset, anchor="ne", width=12, height=track_h)
         self.bar.delete("all")
-        color = palette.scroll_thumb
-        x0, x1 = 4, 9
+        # Resting thumb is a 2 px line, 5 px from the window edge. Hover grows it to 6 px.
+        color = "#8A8A8A" if palette.bg.upper() == "#F3F3F3" else "#9D9D9D"
+        width = max(2, min(6, int(self._thumb_px)))
+        x1 = 12 - 5
+        x0 = x1 - width
         y0, y1 = thumb_y, thumb_y + thumb_h
-        radius = 3
+        if width >= 5:
+            self._arrow(6, 4, up=True, color=color)
+            self._arrow(6, track_h - 4, up=False, color=color)
+            y0 = max(y0, 14)
+            y1 = min(y1, track_h - 14)
+        radius = max(1, width // 2)
         if y1 - y0 <= radius * 2:
-            self.bar.create_oval(x0, y0, x1, y1, fill=color, outline=color)
+            self.bar.create_oval(x0, y0, x1, max(y1, y0 + 2), fill=color, outline=color)
             return
         self.bar.create_rectangle(x0, y0 + radius, x1, y1 - radius, fill=color, outline=color)
         self.bar.create_oval(x0, y0, x1, y0 + radius * 2, fill=color, outline=color)
         self.bar.create_oval(x0, y1 - radius * 2, x1, y1, fill=color, outline=color)
+
+    def _arrow(self, x: int, y: int, up: bool, color: str) -> None:
+        if up:
+            self.bar.create_polygon(x - 3, y + 2, x + 3, y + 2, x, y - 2, fill=color, outline=color)
+        else:
+            self.bar.create_polygon(x - 3, y - 2, x + 3, y - 2, x, y + 2, fill=color, outline=color)
+
+    def _aim(self, target: int) -> None:
+        self._thumb_target = target
+        if self._anim is not None:
+            try:
+                self.after_cancel(self._anim)
+            except tk.TclError:
+                pass
+            self._anim = None
+        self._step_thumb()
+
+    def _step_thumb(self) -> None:
+        self._anim = None
+        if self._thumb_px == self._thumb_target:
+            self._place_thumb()
+            return
+        self._thumb_px += 1 if self._thumb_target > self._thumb_px else -1
+        self._place_thumb()
+        try:
+            self._anim = self.after(16, self._step_thumb)
+        except tk.TclError:
+            self._anim = None
+
+    def _on_bar_click(self, event: tk.Event) -> None:
+        if self._thumb_px < 5:
+            return
+        height = self.bar.winfo_height()
+        if event.y < 16:
+            self.canvas.yview_scroll(-48, "units")
+        elif event.y > height - 16:
+            self.canvas.yview_scroll(48, "units")
+        self._place_thumb()

@@ -28,6 +28,8 @@ def _open(name: str, colour: str | None) -> Image.Image:
     if colour is None:
         path = PNG / f"{name}.png"
     else:
+        # #1B1B1B is one step from the rendered #1A1A1A plates.
+        colour = {"1B1B1B": "1A1A1A"}.get(colour.upper(), colour.upper())
         path = PNG / f"{name}__{colour}.png"
     return Image.open(path).convert("RGBA")
 

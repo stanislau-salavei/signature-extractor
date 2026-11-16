@@ -183,7 +183,10 @@ class WidgetChromeTests(unittest.TestCase):
         menu.set_items([(str(index), None, lambda: None) for index in range(5)])
         menu.show(anchor)
         self.root.update()
-        self.assertEqual(menu.card_size, (228, 203))
+        width, height = menu.card_size
+        self.assertGreater(height, 5 * 36)
+        self.assertNotEqual((width, height), (228, 203))
+        self.assertLess(width, 420)
         menu.hide()
 
 

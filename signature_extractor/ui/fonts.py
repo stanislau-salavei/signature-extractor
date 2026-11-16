@@ -42,6 +42,15 @@ def semibold(size: int) -> ctk.CTkFont:
     return ctk.CTkFont(family=family(), size=size, weight="normal")
 
 
+def group_font(size: int) -> ctk.CTkFont:
+    """Section titles: Semibold, or Bold when that face is not installed."""
+    names = _families()
+    for candidate in ("Segoe UI Semibold", "Segoe UI SemiBold", "Inter Semi Bold"):
+        if candidate in names:
+            return ctk.CTkFont(family=candidate, size=size, weight="normal")
+    return ctk.CTkFont(family=family(), size=size, weight="bold")
+
+
 def medium(size: int) -> ctk.CTkFont:
     """Weight 500. Tk has no 500, so this uses a Medium face when one is installed."""
     names = _families()
