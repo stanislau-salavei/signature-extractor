@@ -63,7 +63,7 @@ class OverflowMenu:
         window.configure(bg=outside)
 
         radius = px(8)
-        margin = px(16)
+        margin = px(6)
         row_h = px(40)
         # Hover fill sits 4 px in from the menu edges. Rows themselves are the 40 px step.
         edge = px(4)
@@ -199,11 +199,10 @@ def _menu_font(pixel_size: int) -> tuple[str, int]:
 
 
 def _paint_flyout(canvas, x, y, width, height, radius, fill, border, outside) -> None:
-    """Rounded menu. Stacked grey plates stand in for the Win11 blur; Tk has no alpha here."""
-    light = fill.upper() not in {"#2C2C2C", "#2B2B2B", "#202020"}
-    layers = (("#D5D5D5", 5), ("#E6E6E6", 3), ("#F2F2F2", 1)) if light else (("#101010", 5), ("#161616", 3), ("#1C1C1C", 1))
-    for shade, drop in layers:
-        _round_rect(canvas, x + 1, y + drop, width, height, radius, shade)
+    """Rounded card plus a 3 px offset. Tk cannot blur, so the shadow stays thin."""
+    light = fill.upper() not in {"#2C2C2C", "#2B2B2B", "#202020", "#333333"}
+    shadow = "#C8C8C8" if light else "#141414"
+    _round_rect(canvas, x, y + 3, width, height, radius, shadow)
     _round_rect(canvas, x, y, width, height, radius, fill)
     _round_rect(canvas, x, y, width, height, radius, border, outline_only=True)
     canvas.configure(bg=outside)

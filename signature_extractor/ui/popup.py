@@ -157,6 +157,22 @@ class BorderlessPopup:
             screen,
             gap=gap,
         )
+        self._place_card(body_x, body_y, body_width, body_height, margin)
+
+    def reveal_card(self, x: int, y: int, body_width: int, body_height: int, margin: int = 0) -> None:
+        """Put the card's top-left at ``(x, y)`` in screen pixels, kept on the anchor window."""
+        if not self.is_open():
+            return
+        top = self.master.winfo_toplevel()
+        left = int(top.winfo_rootx())
+        top_y = int(top.winfo_rooty())
+        right = left + int(top.winfo_width())
+        bottom = top_y + int(top.winfo_height())
+        x = max(left, min(int(x), right - body_width))
+        y = max(top_y, min(int(y), bottom - body_height))
+        self._place_card(x, y, body_width, body_height, margin)
+
+    def _place_card(self, body_x: int, body_y: int, body_width: int, body_height: int, margin: int) -> None:
         self._map(body_x - margin, body_y - margin, body_width + margin * 2, body_height + margin * 2)
         self._armed = False
         if self._arm_job is not None:

@@ -189,7 +189,7 @@ settings.height_mm,"37, 49","Высота, мм","Height, mm",Field label. Unit 
 settings.delete_size.title,"51, 56",Удалить размер «{name}»?,Delete size “{name}”?,Long names make the title long; dialog wraps.
 settings.delete_size.default_note,51,По умолчанию станет {size},{size} will become the default,Shown when the deleted size is the default.
 settings.margin,"27, 36, 37, 49, 51, 52, 56",Поле рамки при обрезке,Frame margin,Settings row. Russian adds «при обрезке» (when cropping); English uses the same term as export.png.margin. Approved 2026-11-15.
-settings.margin.desc,"27, 36, 37, 49, 51, 52, 56",Отступ от подписи до края файла,Space around the signature,Secondary line. Shortened to fit. Approved 2026-11-15.
+settings.margin.desc,"27, 36, 37, 49, 51, 52, 56",Отступ от подписи до края файла в миллиметрах,Distance from the signature to the file edge in millimetres,Unit lives in this description; the field is numbers only. Approved 2026-11-16.
 settings.color_default,"27, 36, 37, 49, 51, 52, 56",Цвет подписи по умолчанию,Default signature color,
 settings.color_default.desc,"27, 36, 37, 49, 51, 52, 56",Цвет штрихов в сохранённом файле,Stroke color in the saved file,
 settings.png_resolution,"27, 36, 37, 49, 51, 52, 56",Разрешение PNG,PNG resolution,

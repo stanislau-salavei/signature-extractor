@@ -8,7 +8,7 @@ import tkinter as tk
 import tkinter.font as tkfont
 
 from signature_extractor.ui.fonts import family, ui_scale
-from signature_extractor.ui.popup import BorderlessPopup
+from signature_extractor.ui.popup import BorderlessPopup, widget_screen_rect
 from signature_extractor.ui.theme import current_palette
 from signature_extractor.ui.widgets.menu import _menu_font, _paint_flyout, _round_rect
 
@@ -49,7 +49,7 @@ class ChoiceMenu:
             outside = palette.menu_bg
         window.configure(bg=outside)
 
-        row_h = px(36)
+        row_h = px(32)
         edge = px(4)
         measure = tkfont.Font(family=family(), size=-px(14))
         text_w = max((measure.measure(label) for label, _selected, _command in rows), default=px(80))
@@ -57,10 +57,12 @@ class ChoiceMenu:
             anchor_w = int(anchor.winfo_width())
         except tk.TclError:
             anchor_w = 0
-        card_w = max(text_w + px(28), anchor_w, px(140))
+        card_w = max(text_w + px(36), anchor_w, px(140))
         card_h = edge * 2 + len(rows) * row_h
-        margin = px(12)
+        margin = px(6)
         radius = px(8)
+        selected_index = next((index for index, (_label, selected, _command) in enumerate(rows) if selected), 0)
+        self._selected_plates: set[str] = set()
 
         canvas = tk.Canvas(
             window,
@@ -73,26 +75,40 @@ class ChoiceMenu:
         canvas.pack()
         _paint_flyout(canvas, margin, margin, card_w, card_h, radius, palette.menu_bg, palette.menu_border, outside)
 
+        light = palette.bg.upper() == "#F3F3F3"
+        selected_fill = "#F3F3F3" if light else "#3A3A3A"
         y = margin + edge
         for index, (label, selected, command) in enumerate(rows):
             hit = f"item{index}"
             plate = f"plate{index}"
+            if selected:
+                self._selected_plates.add(plate)
             _round_rect(
                 canvas,
                 margin + edge,
-                y + px(2),
+                y + px(1),
                 card_w - edge * 2,
-                row_h - px(4),
+                row_h - px(2),
                 px(4),
-                palette.menu_bg,
+                selected_fill if selected else palette.menu_bg,
                 tags=(plate,),
             )
+            if selected:
+                canvas.create_rectangle(
+                    margin + edge + px(2),
+                    y + px(6),
+                    margin + edge + px(5),
+                    y + row_h - px(6),
+                    fill=palette.accent,
+                    outline=palette.accent,
+                    tags=(hit,),
+                )
             canvas.create_text(
-                margin + px(12),
+                margin + px(16),
                 y + row_h // 2,
                 text=label,
                 anchor="w",
-                fill=palette.accent if selected else palette.text,
+                fill=palette.text,
                 font=_menu_font(px(14)),
                 tags=(hit,),
             )
@@ -108,14 +124,12 @@ class ChoiceMenu:
 
         self._canvas = canvas
         self._popup = popup
-        popup.reveal_body(
-            anchor,
-            body_width=card_w,
-            body_height=card_h,
-            align_right=anchor,
-            gap=px(2),
-            margin=margin,
-        )
+        ax, ay, aw, ah = widget_screen_rect(anchor)
+        # The selected row covers the closed field. The list grows up and down from there.
+        row_top = edge + selected_index * row_h
+        body_x = ax + aw - card_w
+        body_y = ay + ah / 2 - (row_top + row_h / 2)
+        popup.reveal_card(int(body_x), int(body_y), card_w, card_h, margin)
 
     def _activate(self, command: Callable[[], None]) -> None:
         self.close()
@@ -126,7 +140,11 @@ class ChoiceMenu:
         if canvas is None:
             return
         palette = current_palette()
-        color = palette.menu_hover if on else palette.menu_bg
+        light = palette.bg.upper() == "#F3F3F3"
+        if tag in self._selected_plates:
+            color = "#F3F3F3" if light else "#3A3A3A"
+        else:
+            color = palette.menu_hover if on else palette.menu_bg
         for item in canvas.find_withtag(tag):
             if canvas.type(item) in {"rectangle", "polygon", "arc"}:
                 try:

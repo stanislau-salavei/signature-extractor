@@ -11,7 +11,7 @@ from signature_extractor.controller.state import AppController
 from signature_extractor.ui.fonts import group_font, logical_text_width, ui_font
 from signature_extractor.ui.svg_icons import svg_image
 from signature_extractor.ui.widgets.choice_menu import ChoiceMenu
-from signature_extractor.ui.widgets.controls import EdgedButton, EdgedEntry, Mark, SuffixedField, Toggle
+from signature_extractor.ui.widgets.controls import EdgedButton, Mark, Toggle, WinField
 from signature_extractor.ui.theme import (
     COLOR_SWATCHES,
     CONTENT_MAX_WIDTH,
@@ -214,6 +214,7 @@ class SettingsPage(ctk.CTkFrame):
                 self._format_marks,
                 self._toggle_format,
                 label_text=fmt.upper(),
+                desc_key=f"export.{fmt}.desc",
             )
         self.size_value = self._value_row(
             block, "size", "settings.sizes", None, boxed=False, command=self._open_sizes
@@ -221,12 +222,9 @@ class SettingsPage(ctk.CTkFrame):
         margin_controls, _title, _desc = self._card(
             block, "crop", "settings.margin", "settings.margin.desc"
         )
-        self.margin_field = SuffixedField(margin_controls)
+        self.margin_field = WinField(margin_controls, width=96, numeric=True, on_apply=self._commit_margin)
         self.margin_field.pack(side="left")
         self.margin_entry = self.margin_field.entry
-        self.margin_suffix = self.margin_field.suffix
-        self.margin_entry.bind("<FocusOut>", self._commit_margin)
-        self.margin_entry.bind("<Return>", self._commit_margin)
         self.color_value, self.color_swatch = self._color_row(block)
         self.dpi_value = self._value_row(
             block,
@@ -248,21 +246,9 @@ class SettingsPage(ctk.CTkFrame):
         name_controls, _title, _desc = self._card(
             block, "type", "settings.name_template", "settings.name_template.desc"
         )
-        self.template_entry = EdgedEntry(
-            name_controls,
-            width=180,
-            height=32,
-            corner_radius=4,
-            border_width=1,
-            font=ui_font(14),
-            fg_color=pair("input_bg"),
-            border_color=pair("ctl_stroke"),
-            bottom_color=pair("input_bottom"),
-            text_color=pair("text"),
-        )
-        self.template_entry.pack(side="left")
-        self.template_entry.bind("<FocusOut>", self._commit_template)
-        self.template_entry.bind("<Return>", self._commit_template)
+        self.template_field = WinField(name_controls, width=200, on_apply=self._commit_template)
+        self.template_field.pack(side="left")
+        self.template_entry = self.template_field.entry
         self.exists_value = self._value_row(
             block,
             "files",
@@ -274,17 +260,8 @@ class SettingsPage(ctk.CTkFrame):
 
     def _build_about(self, on_check: Callable[[], None]) -> None:
         block = self._section("settings.about")
-        card = ctk.CTkFrame(
-            block,
-            fg_color=pair("card"),
-            border_color=pair("card_border"),
-            border_width=1,
-            corner_radius=8,
-            bg_color=pair("bg"),
-        )
-        card.pack(fill="x", pady=(0, 3))
-        card.configure(corner_radius=4)
-        row = ctk.CTkFrame(card, fg_color="transparent", height=63)
+        _shell, inner = self._framed(block, radius=4)
+        row = ctk.CTkFrame(inner, fg_color="transparent", height=63)
         row.pack(fill="x", padx=16)
         row.pack_propagate(False)
         logo = self._app_logo()
@@ -303,7 +280,7 @@ class SettingsPage(ctk.CTkFrame):
         self.about_chevron.pack(side="left")
         for widget in (row, side, self.about_chevron, self.version_label):
             widget.bind("<Button-1>", lambda _event: self._toggle_about())
-        self.about_body = ctk.CTkFrame(card, fg_color=pair("card"), corner_radius=0)
+        self.about_body = ctk.CTkFrame(inner, fg_color=pair("card"), corner_radius=0)
         self.about_divider = ctk.CTkFrame(self.about_body, height=1, fg_color=pair("divider"))
         self.about_divider.pack(fill="x")
         self.about_inner = ctk.CTkFrame(self.about_body, fg_color=pair("card"))
@@ -533,17 +510,23 @@ class SettingsPage(ctk.CTkFrame):
             self.about_body.pack_forget()
             self.about_chevron.configure(image=svg_image("chevron_down", 16, "muted"))
 
-    def _expander(self, parent, icon_name, title_key, desc_key, command):
-        card = ctk.CTkFrame(
+    def _framed(self, parent, radius: int = 8):
+        """One border around the header and the expanded body. Children cannot paint over it."""
+        shell = ctk.CTkFrame(
             parent,
-            fg_color=pair("card"),
-            border_color=pair("card_border"),
-            border_width=1,
-            corner_radius=8,
+            fg_color=pair("card_border"),
+            corner_radius=radius,
+            border_width=0,
             bg_color=pair("bg"),
         )
-        card.pack(fill="x", pady=(0, 3))
-        head = ctk.CTkFrame(card, fg_color="transparent", height=63)
+        shell.pack(fill="x", pady=(0, 3))
+        inner = ctk.CTkFrame(shell, fg_color=pair("card"), corner_radius=max(0, radius - 1), border_width=0)
+        inner.pack(fill="x", padx=1, pady=1)
+        return shell, inner
+
+    def _expander(self, parent, icon_name, title_key, desc_key, command):
+        _shell, inner = self._framed(parent, radius=8)
+        head = ctk.CTkFrame(inner, fg_color="transparent", height=63)
         head.pack(fill="x", padx=16)
         head.pack_propagate(False)
         icon = ctk.CTkLabel(head, text="", image=svg_image(_ROW_ICONS[icon_name], 24, "text"))
@@ -562,26 +545,38 @@ class SettingsPage(ctk.CTkFrame):
         value.pack(side="left", padx=(0, 6))
         chevron = ctk.CTkLabel(side, text="", image=svg_image("chevron_down", 16, "muted"))
         chevron.pack(side="left")
-        body = ctk.CTkFrame(card, fg_color=pair("card"))
+        body = ctk.CTkFrame(inner, fg_color=pair("card"))
         ctk.CTkFrame(body, height=1, fg_color=pair("divider")).pack(fill="x")
         for widget in (head, icon, words, title, desc, side, value, chevron):
             widget.bind("<Button-1>", lambda _event: command())
             widget.configure(cursor="hand2")
-        return card, value, chevron, body
+        return _shell, value, chevron, body
 
-    def _option_row(self, parent, key, text_key, kind, store, command, label_text=None):
-        row = ctk.CTkFrame(parent, fg_color="transparent", height=36)
-        row.pack(fill="x", padx=16)
-        row.pack_propagate(False)
+    def _option_row(self, parent, key, text_key, kind, store, command, label_text=None, desc_key=None):
+        if store and kind == "check":
+            ctk.CTkFrame(parent, height=1, fg_color=pair("divider")).pack(fill="x")
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        if kind == "radio":
+            row.configure(height=40)
+            row.pack_propagate(False)
+        row.pack(fill="x")
         mark = Mark(row, kind)
-        mark.pack(side="left", padx=(8, 10))
+        mark.pack(side="left", padx=(54, 8), pady=(10, 8), anchor="n")
+        column = ctk.CTkFrame(row, fg_color="transparent")
+        column.pack(side="left", fill="x", expand=True, pady=(6, 6))
         if label_text is None:
-            label = self._add_label(row, text_key, font=ui_font(14), text_color=pair("text"), anchor="w")
+            label = self._add_label(column, text_key, font=ui_font(14), text_color=pair("text"), anchor="w")
         else:
-            label = ctk.CTkLabel(row, text=label_text, font=ui_font(14), text_color=pair("text"), anchor="w")
-        label.pack(side="left", fill="x", expand=True)
+            label = ctk.CTkLabel(column, text=label_text, font=ui_font(14), text_color=pair("text"), anchor="w")
+        label.pack(anchor="w")
+        desc = None
+        if desc_key:
+            desc = self._add_label(column, desc_key, font=ui_font(12), text_color=pair("muted"), anchor="w")
+            desc.pack(anchor="w")
         store[key] = mark
-        for widget in (row, mark, label):
+        for widget in (row, mark, label, column, desc):
+            if widget is None:
+                continue
             widget.bind("<Button-1>", lambda _event, name=key: command(name))
             widget.configure(cursor="hand2")
 
@@ -629,10 +624,16 @@ class SettingsPage(ctk.CTkFrame):
 
     def _show_margin(self, text) -> None:
         full = text("export.size.mm_value", n=self.controller.settings["frame_margin_mm"])
-        unit = full.rsplit(" ", 1)[-1]
-        number = full[: -len(unit)].strip()
-        self.margin_suffix.configure(text=unit)
+        number = full.rsplit(" ", 1)[0].strip()
         self._set_entry(self.margin_entry, number)
+
+    def repaint_chrome(self) -> None:
+        """Canvas controls do not hear CustomTkinter's theme callback."""
+        for mark in (*self._theme_marks.values(), *self._format_marks.values()):
+            mark._paint()
+        for switch in (self.ai_switch, self.gpu_switch, self.updates_switch):
+            switch._paint()
+        self.scroll.apply_colors()
 
     def _open_language(self, anchor) -> None:
         self._choice_popup(
@@ -792,6 +793,8 @@ class SettingsPage(ctk.CTkFrame):
                 switch.select()
             else:
                 switch.deselect()
+        else:
+            switch._paint()
 
     def _open_license(self) -> None:
         self._on_open_url(URL_GPL)

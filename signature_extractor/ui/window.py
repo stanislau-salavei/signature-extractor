@@ -293,6 +293,7 @@ class MainWindow(ctk.CTk):
         if mode != self._seen_mode:
             self._seen_mode = mode
             self.import_page.refresh_chrome()
+            self.settings_page.repaint_chrome()
             from signature_extractor.ui.caption import apply_titlebar
 
             apply_titlebar(self)
