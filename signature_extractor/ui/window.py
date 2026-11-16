@@ -14,6 +14,7 @@ from signature_extractor import __version__
 from signature_extractor.controller.state import AppController
 from signature_extractor.paths import app_icon_path, license_path
 from signature_extractor.ui.icons import icon_image, pil_icon
+from signature_extractor.ui.popup import BorderlessPopup
 from signature_extractor.ui.pages.help_page import HelpPage
 from signature_extractor.ui.pages.import_page import ImportPage
 from signature_extractor.ui.pages.settings_page import SettingsPage
@@ -280,7 +281,7 @@ class MainWindow(ctk.CTk):
         return "break"
 
     def _shortcut_escape(self, _event=None):
-        if self.menu.is_open():
+        if BorderlessPopup.close_all() or self.menu.is_open():
             self.menu.hide()
             return "break"
         if self._modal:

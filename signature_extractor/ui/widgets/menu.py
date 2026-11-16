@@ -6,16 +6,18 @@ from collections.abc import Callable
 
 import tkinter as tk
 
+from signature_extractor.ui.popup import BorderlessPopup
 from signature_extractor.ui.theme import current_palette
 
 
 class OverflowMenu:
-    """Floating menu under the ⋯ button. Not a separate top-level document window."""
+    """Floating menu under the ⋯ button. Not a separate document window."""
 
     def __init__(self, master: tk.Misc):
         self.master = master
-        self._popup: tk.Toplevel | None = None
+        self._popup: BorderlessPopup | None = None
         self._commands: list[tuple[str, object, Callable[[], None]]] = []
+        self._swallow_reopen = False
 
     def set_items(self, items: list[tuple[str, object, Callable[[], None]]]) -> None:
         """``items`` is ``(label, image, command)`` in menu order, with a separator after the second."""
@@ -24,22 +26,19 @@ class OverflowMenu:
             self.hide()
 
     def is_open(self) -> bool:
-        return self._popup is not None and self._popup.winfo_exists()
-
-    def toggle(self, anchor: tk.Widget) -> None:
-        if self.is_open():
-            self.hide()
-        else:
-            self.show(anchor)
+        return self._popup is not None and self._popup.is_open()
 
     def show(self, anchor: tk.Widget) -> None:
+        # The opening click's ButtonRelease follows the Button-1 that closed
+        # the menu. Swallow that release so the menu stays closed.
+        if self._swallow_reopen:
+            self._swallow_reopen = False
+            return
         self.hide()
         palette = current_palette()
-        popup = tk.Toplevel(self.master)
-        popup.overrideredirect(True)
-        popup.transient(self.master.winfo_toplevel())
-        popup.configure(bg=palette.menu_border)
-        body = tk.Frame(popup, bg=palette.menu_bg, highlightthickness=0)
+        popup = BorderlessPopup(self.master, on_anchor_press=self._note_anchor_press)
+        popup.window.configure(bg=palette.menu_border)
+        body = tk.Frame(popup.window, bg=palette.menu_bg, highlightthickness=0)
         body.pack(padx=1, pady=1)
         inner = tk.Frame(body, bg=palette.menu_bg)
         inner.pack(padx=6, pady=6)
@@ -72,30 +71,17 @@ class OverflowMenu:
             bind(row)
             for child in row.winfo_children():
                 bind(child)
-        popup.update_idletasks()
-        x = anchor.winfo_rootx() + anchor.winfo_width() - popup.winfo_reqwidth()
-        y = anchor.winfo_rooty() + anchor.winfo_height() + 4
-        popup.geometry(f"+{max(x, 0)}+{max(y, 0)}")
-        popup.bind("<Escape>", lambda _event: self.hide())
         self._popup = popup
-        # Close on the next click anywhere outside the menu.
-        # bind (not bind_all) so CustomTkinter's own click handler stays in place.
-        self._outside_bind = self.master.bind("<Button-1>", self._click_outside, add="+")
+        popup.reveal_under(anchor, min_width=228)
 
     def hide(self) -> None:
-        bind_id = getattr(self, "_outside_bind", None)
-        if bind_id is not None:
-            try:
-                self.master.unbind("<Button-1>", bind_id)
-            except tk.TclError:
-                pass
-            self._outside_bind = None
-        if self._popup is not None:
-            try:
-                self._popup.destroy()
-            except tk.TclError:
-                pass
-            self._popup = None
+        popup = self._popup
+        self._popup = None
+        if popup is not None:
+            popup.close()
+
+    def _note_anchor_press(self) -> None:
+        self._swallow_reopen = True
 
     def _activate(self, command: Callable[[], None]) -> None:
         self.hide()
@@ -110,16 +96,6 @@ class OverflowMenu:
                 child.configure(bg=color)
             except tk.TclError:
                 pass
-
-    def _click_outside(self, event: tk.Event) -> None:
-        if self._popup is None:
-            return
-        widget = event.widget
-        while widget is not None:
-            if widget is self._popup:
-                return
-            widget = getattr(widget, "master", None)
-        self.hide()
 
 
 def _menu_font() -> tuple[str, int]:

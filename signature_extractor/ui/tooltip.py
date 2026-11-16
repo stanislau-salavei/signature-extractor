@@ -25,8 +25,12 @@ class Tooltip:
         self._hide()
         palette = current_palette()
         tip = tk.Toplevel(self.widget)
+        tip.withdraw()
         tip.overrideredirect(True)
-        tip.attributes("-topmost", True)
+        try:
+            tip.attributes("-topmost", True)
+        except tk.TclError:
+            pass
         label = tk.Label(
             tip,
             text=text,
@@ -42,7 +46,13 @@ class Tooltip:
         tip.update_idletasks()
         x = self.widget.winfo_rootx()
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
-        tip.geometry(f"+{x}+{y}")
+        width = max(tip.winfo_reqwidth(), 1)
+        height = max(tip.winfo_reqheight(), 1)
+        geometry = f"{width}x{height}+{x}+{y}"
+        tip.geometry(geometry)
+        tip.deiconify()
+        tip.lift()
+        tip.geometry(geometry)
         self._tip = tip
 
     def _hide(self, _event: tk.Event | None = None) -> None:

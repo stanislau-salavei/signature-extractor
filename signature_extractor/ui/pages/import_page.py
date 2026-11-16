@@ -30,7 +30,14 @@ class ImportPage(ctk.CTkFrame):
         self.drop = DropZone(self)
         self.drop.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
 
-        tile = ctk.CTkFrame(self.drop.inner, width=84, height=84, corner_radius=8, fg_color=pair("accent_soft"))
+        tile = ctk.CTkFrame(
+            self.drop.inner,
+            width=84,
+            height=84,
+            corner_radius=8,
+            fg_color=pair("accent_soft"),
+            bg_color=pair("drop"),
+        )
         tile.pack(pady=(0, 6))
         tile.pack_propagate(False)
         ctk.CTkLabel(tile, text="", image=icon_image("upload", 40, "accent")).place(relx=0.5, rely=0.5, anchor="center")
@@ -54,6 +61,7 @@ class ImportPage(ctk.CTkFrame):
             fg_color=pair("accent"),
             hover_color=pair("accent_hover"),
             text_color=pair("on_accent"),
+            bg_color=pair("drop"),
             image=icon_image("image", 17, "on_accent"),
             compound="left",
             command=on_open_file,
@@ -70,6 +78,7 @@ class ImportPage(ctk.CTkFrame):
             border_color=pair("secondary_border"),
             border_width=1,
             text_color=pair("text"),
+            bg_color=pair("drop"),
             image=icon_image("folder", 17, "text"),
             compound="left",
             command=on_open_folder,
@@ -83,6 +92,7 @@ class ImportPage(ctk.CTkFrame):
             border_color=pair("tips_border"),
             border_width=1,
             corner_radius=6,
+            bg_color=pair("bg"),
         )
         tips.grid(row=1, column=0, sticky="ew")
         badge = ctk.CTkLabel(

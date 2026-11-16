@@ -52,6 +52,7 @@ class HelpPage(ctk.CTkFrame):
             border_color=pair("card_border"),
             border_width=1,
             corner_radius=8,
+            bg_color=pair("bg"),
         )
         self.list.pack(anchor="n", pady=8, padx=56, fill="x")
         for key in _SECTIONS:

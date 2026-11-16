@@ -11,6 +11,7 @@ from signature_extractor import __version__
 from signature_extractor.controller.state import AppController
 from signature_extractor.ui.fonts import ui_font
 from signature_extractor.ui.icons import icon_image
+from signature_extractor.ui.popup import BorderlessPopup
 from signature_extractor.ui.theme import (
     COLOR_SWATCHES,
     CONTENT_MAX_WIDTH,
@@ -71,7 +72,7 @@ class SettingsPage(ctk.CTkFrame):
         self.controller = controller
         self._on_open_url = on_open_url
         self._labels: list[tuple[ctk.CTkLabel, str]] = []
-        self._popup: tk.Toplevel | None = None
+        self._popup: BorderlessPopup | None = None
         self._about_open = True
         self.folder_path: ctk.CTkLabel | None = None
 
@@ -263,6 +264,7 @@ class SettingsPage(ctk.CTkFrame):
             border_color=pair("card_border"),
             border_width=1,
             corner_radius=8,
+            bg_color=pair("bg"),
         )
         card.pack(fill="x", pady=2)
         row = ctk.CTkFrame(card, fg_color="transparent")
@@ -317,6 +319,7 @@ class SettingsPage(ctk.CTkFrame):
             border_color=pair("card_border"),
             border_width=1,
             corner_radius=8,
+            bg_color=pair("bg"),
         )
         updates.pack(fill="x", pady=2)
         inner = ctk.CTkFrame(updates, fg_color="transparent")
@@ -346,6 +349,7 @@ class SettingsPage(ctk.CTkFrame):
             border_color=pair("card_border"),
             border_width=1,
             corner_radius=8,
+            bg_color=pair("bg"),
         )
         card.pack(fill="x", pady=2)
         card.grid_columnconfigure(1, weight=1)
@@ -591,27 +595,22 @@ class SettingsPage(ctk.CTkFrame):
         command(value)
 
     def _popup_shell(self, anchor):
-        popup = tk.Toplevel(self)
-        popup.overrideredirect(True)
-        popup.configure(bg=self._menu_border())
-        inner = tk.Frame(popup, bg=self._menu_bg())
+        self._close_popup()
+        popup = BorderlessPopup(self)
+        popup.window.configure(bg=self._menu_border())
+        inner = tk.Frame(popup.window, bg=self._menu_bg(), highlightthickness=0)
         inner.pack(padx=1, pady=1)
         self._popup = popup
         return popup, inner
 
-    def _place_popup(self, popup, anchor) -> None:
-        popup.update_idletasks()
-        x = anchor.winfo_rootx() + anchor.winfo_width() - popup.winfo_reqwidth()
-        y = anchor.winfo_rooty() + anchor.winfo_height() + 4
-        popup.geometry(f"+{max(x, 0)}+{y}")
+    def _place_popup(self, popup: BorderlessPopup, anchor) -> None:
+        popup.reveal_under(anchor, min_width=120)
 
     def _close_popup(self) -> None:
-        if self._popup is not None:
-            try:
-                self._popup.destroy()
-            except tk.TclError:
-                pass
-            self._popup = None
+        popup = self._popup
+        self._popup = None
+        if popup is not None:
+            popup.close()
 
     def _menu_bg(self) -> str:
         from signature_extractor.ui.theme import current_palette
