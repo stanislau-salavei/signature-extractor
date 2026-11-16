@@ -7,7 +7,7 @@ from collections.abc import Callable
 import customtkinter as ctk
 
 from signature_extractor.ui.fonts import ui_font
-from signature_extractor.ui.icons import icon_image
+from signature_extractor.ui.svg_icons import svg_image
 from signature_extractor.ui.theme import SETTINGS_HEADER_HEIGHT, pair
 
 _SECTIONS = (
@@ -38,7 +38,7 @@ class HelpPage(ctk.CTkFrame):
             corner_radius=4,
             fg_color="transparent",
             hover_color=pair("menu_hover"),
-            image=icon_image("back", 16, "text"),
+            image=svg_image("settings_back", 16, "text"),
             command=on_back,
         ).place(x=8, rely=0.5, anchor="w")
         self.title = ctk.CTkLabel(header, text="", font=ui_font(20, "bold"), text_color=pair("text"))

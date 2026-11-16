@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="16" height="16" shape-rendering="geometricPrecision">
+  
+  <defs>
+    <linearGradient id="tb-g" x1="0" y1="0" x2="0.18" y2="1">
+      <stop offset="0%" stop-color="#1B84DB"></stop>
+      <stop offset="48%" stop-color="#005FB8"></stop>
+      <stop offset="100%" stop-color="#004687"></stop>
+    </linearGradient>
+    <linearGradient id="tb-shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity=".28"></stop>
+      <stop offset="40%" stop-color="#fff" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="tb-paper" x1="0" y1="0" x2=".2" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"></stop>
+      <stop offset="100%" stop-color="#EEF3F8"></stop>
+    </linearGradient>
+    <filter id="tb-obj" x="-25%" y="-15%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6.5" flood-color="#002044" flood-opacity=".34"></feDropShadow>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#tb-g)"></rect>
+  <rect width="256" height="256" rx="56" fill="url(#tb-shine)"></rect>
+  <g filter="url(#tb-obj)">
+    <path fill="url(#tb-paper)" d="M68 38H160L206 84V208C206 219.046 197.046 228 186 228H68C56.954 228 48 219.046 48 208V58C48 46.954 56.954 38 68 38Z"></path>
+  </g>
+  <path fill="#B7D4F0" d="M160 38L206 84H174C166.268 84 160 77.732 160 70V38Z"></path>
+  <path fill="#9EC4E6" d="M160 38L206 84L198.5 84L160 47Z" opacity=".7"></path>
+  <path fill="none" stroke="#EAF3FB" stroke-width="2.0" stroke-linecap="round" d="M160 40L204 82"></path>
+  
+  <g transform="translate(62,90) scale(5.7)" fill="none" stroke="#005FB8" stroke-width="4.2105" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2.3 16.2C3.8 8 5.4 3.6 7.5 6.2C9.2 8.4 8.8 17.6 11.4 17.5C13.8 17.4 14.6 8.8 16.8 9.4C18.6 9.9 20 13.6 22.5 12"></path>
+  </g>
+</svg>

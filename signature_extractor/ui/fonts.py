@@ -42,9 +42,20 @@ def semibold(size: int) -> ctk.CTkFont:
     return ctk.CTkFont(family=family(), size=size, weight="normal")
 
 
+def medium(size: int) -> ctk.CTkFont:
+    """Weight 500. Tk has no 500, so this uses a Medium face when one is installed."""
+    names = _families()
+    for candidate in ("Inter Medium", "Segoe UI Variable Text", "Segoe UI Variable"):
+        if candidate in names:
+            return ctk.CTkFont(family=candidate, size=size, weight="normal")
+    return ctk.CTkFont(family=family(), size=size, weight="normal")
+
+
 def ui_font(size: int, weight: str = "normal") -> ctk.CTkFont:
     if weight == "bold":
         return semibold(size)
+    if weight == "medium":
+        return medium(size)
     return ctk.CTkFont(family=family(), size=size, weight="normal")
 
 

@@ -40,6 +40,18 @@ class Palette:
     dialog_foot: str
     switch_off: str
     number_off: str
+    accent_text: str
+    ctl_stroke: str
+    ctl_stroke2: str
+    input_bottom: str
+    dim: str
+    toggle_off: str
+    toggle_stroke: str
+    toggle_knob: str
+    primary_border: str
+    primary_bottom: str
+    chip_stroke: str
+    scroll_thumb: str
 
 
 LIGHT = Palette(
@@ -47,63 +59,99 @@ LIGHT = Palette(
     card="#FBFBFB",
     card_border="#E5E5E5",
     drop="#FBFBFB",
-    drop_border="#C4C4C4",
+    drop_border="#8A8A8A",
     tips="#F6F6F6",
     tips_border="#E5E5E5",
     text="#1A1A1A",
-    muted="#616161",
+    muted="#5F5F5F",
     accent="#005FB8",
     accent_hover="#004C93",
     on_accent="#FFFFFF",
-    accent_soft="#E5F4FB",
-    secondary_bg="#FFFFFF",
-    secondary_border="#D6D6D6",
-    secondary_hover="#F5F5F5",
+    # 14% #60CDFF over the panel, not 14% of the light accent.
+    accent_soft="#E5F5FC",
+    secondary_bg="#FEFEFE",
+    secondary_border="#E5E5E5",
+    secondary_hover="#F6F6F6",
     stepper_bg="#F3F3F3",
     stepper_border="#E5E5E5",
     stepper_chip="#FFFFFF",
     input_bg="#FFFFFF",
-    input_border="#D6D6D6",
+    input_border="#E5E5E5",
     menu_bg="#FFFFFF",
-    menu_border="#E5E5E5",
+    menu_border="#D0D0D0",
     menu_hover="#F3F3F3",
-    divider="#E5E5E5",
+    divider="#EAEAEA",
     dialog_bg="#FFFFFF",
     dialog_foot="#F3F3F3",
-    switch_off="#E5E5E5",
-    number_off="#6B6B6B",
+    switch_off="#F6F6F6",
+    number_off="#8B8B8B",
+    accent_text="#003E92",
+    ctl_stroke="#E5E5E5",
+    ctl_stroke2="#D3D3D3",
+    input_bottom="#8A8A8A",
+    dim="#8B8B8B",
+    toggle_off="#F6F6F6",
+    toggle_stroke="#8A8A8A",
+    toggle_knob="#5F5F5F",
+    # color-mix(#005FB8 85%, white) / color-mix(#005FB8 80%, black)
+    primary_border="#2677C3",
+    primary_bottom="#004C93",
+    chip_stroke="#D3D3D3",
+    # rgba(0,0,0,.48) over #F3F3F3
+    scroll_thumb="#7E7E7E",
 )
 
 DARK = Palette(
     bg="#202020",
     card="#2B2B2B",
-    card_border="#3D3D3D",
+    # white at 8% over the panel
+    card_border="#3C3C3C",
     drop="#2B2B2B",
-    drop_border="#5A5A5A",
+    # white at 28% over the panel (drop dash)
+    drop_border="#666666",
     tips="#2B2B2B",
-    tips_border="#3D3D3D",
+    tips_border="#3C3C3C",
     text="#FFFFFF",
-    muted="#ADADAD",
+    # white at 79%
+    muted="#C9C9C9",
     accent="#60CDFF",
     accent_hover="#8AD8FF",
-    on_accent="#1A1A1A",
+    on_accent="#000000",
     accent_soft="#33454D",
     secondary_bg="#323232",
-    secondary_border="#4A4A4A",
+    # white at 9% over the control fill
+    secondary_border="#444444",
     secondary_hover="#3A3A3A",
     stepper_bg="#272727",
-    stepper_border="#3A3A3A",
+    stepper_border="#3B3B3B",
     stepper_chip="#3A3A3A",
-    input_bg="#2B2B2B",
-    input_border="#4A4A4A",
-    menu_bg="#2C2C2C",
-    menu_border="#3F3F3F",
+    input_bg="#2E2E2E",
+    input_border="#444444",
+    menu_bg="#2B2B2B",
+    # white at 10% over the dialog
+    menu_border="#404040",
     menu_hover="#3A3A3A",
-    divider="#3F3F3F",
+    divider="#3C3C3C",
     dialog_bg="#2B2B2B",
     dialog_foot="#202020",
-    switch_off="#5A5A5A",
-    number_off="#9A9A9A",
+    switch_off="#272727",
+    # white at 60%
+    number_off="#999999",
+    accent_text="#60CDFF",
+    ctl_stroke="#444444",
+    # white at 14% over the control / the active step
+    ctl_stroke2="#4F4F4F",
+    input_bottom="#9A9A9A",
+    dim="#999999",
+    toggle_off="#272727",
+    toggle_stroke="#9A9A9A",
+    toggle_knob="#CECECE",
+    # color-mix(#60CDFF 85%, white) / color-mix(#60CDFF 80%, black)
+    primary_border="#78D4FF",
+    primary_bottom="#4DA4CC",
+    chip_stroke="#565656",
+    # white at 44% over #202020
+    scroll_thumb="#828282",
 )
 
 

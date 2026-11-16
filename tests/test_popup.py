@@ -162,8 +162,7 @@ class WidgetChromeTests(unittest.TestCase):
 
         menu.show(anchor)
         self.root.update()
-        label = _find_label(menu._popup.window, "Open")
-        label.event_generate("<Button-1>")
+        _click_menu_text(menu, "Open")
         self.root.update()
         self.assertEqual(clicked, ["open"])
         self.assertFalse(menu.is_open())
@@ -179,6 +178,12 @@ class WidgetChromeTests(unittest.TestCase):
         menu.show(anchor)
         self.root.update()
         self.assertTrue(menu.is_open())
+        menu.hide()
+
+        menu.set_items([(str(index), None, lambda: None) for index in range(5)])
+        menu.show(anchor)
+        self.root.update()
+        self.assertEqual(menu.card_size, (228, 203))
         menu.hide()
 
 
@@ -198,20 +203,16 @@ def _stepper_gaps(stepper):
     return left, top, right, bottom
 
 
-def _find_label(widget, text: str):
-    import tkinter as tk
-
-    if isinstance(widget, tk.Label):
-        try:
-            if widget.cget("text") == text:
-                return widget
-        except tk.TclError:
-            pass
-    for child in widget.winfo_children():
-        found = _find_label(child, text)
-        if found is not None:
-            return found
-    raise AssertionError(f"label {text!r} not found")
+def _click_menu_text(menu, text: str) -> None:
+    canvas = menu._canvas
+    if canvas is None:
+        raise AssertionError("menu canvas is missing")
+    for item in canvas.find_all():
+        if canvas.type(item) == "text" and canvas.itemcget(item, "text") == text:
+            x1, y1, x2, y2 = canvas.bbox(item)
+            canvas.event_generate("<Button-1>", x=(x1 + x2) // 2, y=(y1 + y2) // 2)
+            return
+    raise AssertionError(f"menu text {text!r} not found")
 
 
 if __name__ == "__main__":

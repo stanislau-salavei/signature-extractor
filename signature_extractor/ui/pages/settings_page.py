@@ -9,9 +9,10 @@ import customtkinter as ctk
 
 from signature_extractor import __version__
 from signature_extractor.controller.state import AppController
-from signature_extractor.ui.fonts import ui_font
-from signature_extractor.ui.icons import icon_image
+from signature_extractor.ui.fonts import logical_text_width, ui_font
 from signature_extractor.ui.popup import BorderlessPopup
+from signature_extractor.ui.svg_icons import svg_image
+from signature_extractor.ui.widgets.controls import EdgedButton, EdgedEntry, Toggle
 from signature_extractor.ui.theme import (
     COLOR_SWATCHES,
     CONTENT_MAX_WIDTH,
@@ -55,6 +56,21 @@ _EXISTS_KEYS = {
     "ask": "settings.if_exists.ask",
 }
 _FORMAT_ORDER = ("png", "svg", "dxf")
+_ROW_ICONS = {
+    "theme": "settings_icon_theme",
+    "globe": "settings_icon_language",
+    "sparkles": "settings_icon_ai",
+    "monitor": "settings_icon_gpu",
+    "layers": "settings_icon_formats",
+    "size": "settings_icon_size",
+    "crop": "settings_icon_margin",
+    "drop": "settings_icon_color",
+    "image": "settings_icon_dpi",
+    "folder": "settings_icon_folder",
+    "type": "settings_icon_filename",
+    "files": "settings_icon_conflict",
+    "refresh": "settings_icon_update",
+}
 
 
 class SettingsPage(ctk.CTkFrame):
@@ -68,7 +84,7 @@ class SettingsPage(ctk.CTkFrame):
         on_open_url: Callable[[str], None],
         on_check_updates: Callable[[], None],
     ):
-        super().__init__(master, fg_color="transparent")
+        super().__init__(master, fg_color=pair("bg"))
         self.controller = controller
         self._on_open_url = on_open_url
         self._labels: list[tuple[ctk.CTkLabel, str]] = []
@@ -79,7 +95,7 @@ class SettingsPage(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        header = ctk.CTkFrame(self, fg_color="transparent", height=SETTINGS_HEADER_HEIGHT)
+        header = ctk.CTkFrame(self, fg_color=pair("bg"), height=SETTINGS_HEADER_HEIGHT)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_propagate(False)
         back = ctk.CTkButton(
@@ -90,10 +106,10 @@ class SettingsPage(ctk.CTkFrame):
             corner_radius=4,
             fg_color="transparent",
             hover_color=pair("menu_hover"),
-            image=icon_image("back", 16, "text"),
+            image=svg_image("settings_back", 16, "text"),
             command=on_back,
         )
-        back.place(x=8, rely=0.5, anchor="w")
+        back.place(x=3, rely=0.5, anchor="w")
         self.title = self._add_label(
             header,
             "menu.settings",
@@ -107,7 +123,7 @@ class SettingsPage(ctk.CTkFrame):
         self.scroll = ThinScroll(self)
         self.scroll.grid(row=1, column=0, sticky="nsew")
         self.scroll.content.grid_columnconfigure(0, weight=1)
-        self.column = ctk.CTkFrame(self.scroll.content, fg_color="transparent")
+        self.column = ctk.CTkFrame(self.scroll.content, fg_color=pair("bg"))
         self.column.grid(row=0, column=0, sticky="ew")
         self._layout_key: tuple[int, int] | None = None
         self.scroll.bind("<Configure>", self._center_column)
@@ -126,9 +142,7 @@ class SettingsPage(ctk.CTkFrame):
             value = text(key)
             label.configure(text=value)
             if isinstance(label, ctk.CTkButton):
-                from signature_extractor.ui.fonts import text_width
-
-                label.configure(width=text_width(13, value) + 32)
+                label.configure(width=logical_text_width(label, 13, value) + 28)
         self.theme_value.configure(text=text(_THEME_KEYS[self.controller.settings["theme"]]))
         self.language_value.configure(text=text(_LANGUAGE_KEYS[self.controller.settings["language"]]))
         self.formats_value.configure(text=self._formats_label())
@@ -144,6 +158,7 @@ class SettingsPage(ctk.CTkFrame):
         self.gpu_caption.configure(text=text("common.on" if self.controller.settings["gpu_acceleration"] else "common.off"))
         self.updates_caption.configure(text=text("common.on" if self.controller.settings["check_updates"] else "common.off"))
         self.version_label.configure(text=__version__)
+        self._fit_auto_combos()
         self.scroll.apply_colors()
         self._sync_switch(self.ai_switch, self.controller.settings["ai_default"])
         self._sync_switch(self.gpu_switch, self.controller.settings["gpu_acceleration"])
@@ -196,7 +211,7 @@ class SettingsPage(ctk.CTkFrame):
         margin_controls, _title, _desc = self._card(
             block, "crop", "settings.margin", "settings.margin.desc"
         )
-        self.margin_entry = ctk.CTkEntry(
+        self.margin_entry = EdgedEntry(
             margin_controls,
             width=72,
             height=32,
@@ -205,7 +220,8 @@ class SettingsPage(ctk.CTkFrame):
             border_width=1,
             font=ui_font(13),
             fg_color=pair("input_bg"),
-            border_color=pair("input_border"),
+            border_color=pair("ctl_stroke"),
+            bottom_color=pair("input_bottom"),
             text_color=pair("text"),
         )
         self.margin_entry.pack(side="left")
@@ -219,6 +235,7 @@ class SettingsPage(ctk.CTkFrame):
             "settings.png_resolution.desc",
             boxed=True,
             command=self._open_dpi,
+            width=120,
         )
 
     def _build_saving(self, on_change: Callable[[], None], on_open: Callable[[], None]) -> None:
@@ -231,7 +248,7 @@ class SettingsPage(ctk.CTkFrame):
         name_controls, _title, _desc = self._card(
             block, "type", "settings.name_template", "settings.name_template.desc"
         )
-        self.template_entry = ctk.CTkEntry(
+        self.template_entry = EdgedEntry(
             name_controls,
             width=180,
             height=32,
@@ -239,7 +256,8 @@ class SettingsPage(ctk.CTkFrame):
             border_width=1,
             font=ui_font(13),
             fg_color=pair("input_bg"),
-            border_color=pair("input_border"),
+            border_color=pair("ctl_stroke"),
+            bottom_color=pair("input_bottom"),
             text_color=pair("text"),
         )
         self.template_entry.pack(side="left")
@@ -265,8 +283,9 @@ class SettingsPage(ctk.CTkFrame):
             bg_color=pair("bg"),
         )
         card.pack(fill="x", pady=2)
-        row = ctk.CTkFrame(card, fg_color="transparent")
-        row.pack(fill="x", padx=16, pady=12)
+        row = ctk.CTkFrame(card, fg_color="transparent", height=64)
+        row.pack(fill="x", padx=16)
+        row.pack_propagate(False)
         logo = self._app_logo()
         ctk.CTkLabel(row, text="", image=logo).pack(side="left", padx=(0, 14))
         words = ctk.CTkFrame(row, fg_color="transparent")
@@ -279,16 +298,20 @@ class SettingsPage(ctk.CTkFrame):
         side.pack(side="right")
         self.version_label = ctk.CTkLabel(side, text=__version__, font=ui_font(13), text_color=pair("muted"))
         self.version_label.pack(side="left", padx=(0, 6))
-        self.about_chevron = ctk.CTkLabel(side, text="", image=icon_image("chevron_up", 16, "muted"))
+        self.about_chevron = ctk.CTkLabel(side, text="", image=svg_image("chevron_up", 16, "muted"))
         self.about_chevron.pack(side="left")
         for widget in (row, side, self.about_chevron, self.version_label):
             widget.bind("<Button-1>", lambda _event: self._toggle_about())
-        self.about_body = ctk.CTkFrame(card, fg_color="transparent")
-        self.about_body.pack(fill="x", padx=(62, 16), pady=(0, 8))
+        self.about_body = ctk.CTkFrame(card, fg_color=pair("bg"), corner_radius=0)
+        self.about_divider = ctk.CTkFrame(self.about_body, height=1, fg_color=pair("divider"))
+        self.about_divider.pack(fill="x")
+        self.about_inner = ctk.CTkFrame(self.about_body, fg_color="transparent")
+        self.about_inner.pack(fill="x", padx=(62, 16), pady=(8, 12))
+        self.about_body.pack(fill="x")
         self.copyright = ctk.CTkLabel(
-            self.about_body, text=COPYRIGHT, font=ui_font(12), text_color=pair("muted"), anchor="w"
+            self.about_inner, text=COPYRIGHT, font=ui_font(13), text_color=pair("muted"), anchor="w", height=36
         )
-        self.copyright.pack(anchor="w", pady=4)
+        self.copyright.pack(anchor="w", pady=(0, 2))
         for key, url in (
             ("settings.release_notes", URL_RELEASE_NOTES),
             ("settings.all_releases", URL_RELEASES),
@@ -296,14 +319,20 @@ class SettingsPage(ctk.CTkFrame):
             ("settings.source_code", URL_SOURCE),
         ):
             link = self._add_label(
-                self.about_body, key, font=ui_font(14), text_color=pair("accent"), anchor="w", cursor="hand2"
+                self.about_inner,
+                key,
+                font=ui_font(14),
+                text_color=pair("accent"),
+                anchor="w",
+                cursor="hand2",
+                height=40,
             )
-            link.pack(anchor="w", pady=6)
+            link.pack(anchor="w", pady=(0, 2))
             link.bind("<Button-1>", lambda _event, target=url: self._on_open_url(target))
-        license_row = ctk.CTkFrame(self.about_body, fg_color="transparent")
-        license_row.pack(anchor="w", pady=6)
+        license_row = ctk.CTkFrame(self.about_inner, fg_color="transparent", height=40)
+        license_row.pack(anchor="w", fill="x")
         self._add_label(
-            license_row, "settings.license", font=ui_font(12), text_color=pair("muted")
+            license_row, "settings.license", font=ui_font(13), text_color=pair("muted")
         ).pack(side="left", padx=(0, 6))
         gpl = ctk.CTkLabel(
             license_row, text=LICENSE_NAME, font=ui_font(14), text_color=pair("accent"), cursor="hand2"
@@ -320,9 +349,12 @@ class SettingsPage(ctk.CTkFrame):
             bg_color=pair("bg"),
         )
         updates.pack(fill="x", pady=2)
-        inner = ctk.CTkFrame(updates, fg_color="transparent")
-        inner.pack(fill="x", padx=16, pady=12)
-        ctk.CTkLabel(inner, text="", image=icon_image("refresh", 20, "muted")).pack(side="left", padx=(0, 14))
+        inner = ctk.CTkFrame(updates, fg_color="transparent", height=64)
+        inner.pack(fill="x", padx=16)
+        inner.pack_propagate(False)
+        ctk.CTkLabel(inner, text="", image=svg_image("settings_icon_update", 20, "muted")).pack(
+            side="left", padx=(0, 14)
+        )
         self._add_label(
             inner, "settings.check_updates", font=ui_font(14), text_color=pair("text"), anchor="w"
         ).pack(side="left")
@@ -333,10 +365,11 @@ class SettingsPage(ctk.CTkFrame):
         self._button(inner, "settings.check_now", on_check).pack_configure(side="right", padx=(0, 8))
 
     def _section(self, key: str) -> ctk.CTkFrame:
-        block = ctk.CTkFrame(self.column, fg_color="transparent")
-        block.pack(fill="x", pady=(0, 20))
-        self._add_label(block, key, font=ui_font(14), text_color=pair("text"), anchor="w").pack(
-            anchor="w", pady=(8, 8)
+        first = not self.column.winfo_children()
+        block = ctk.CTkFrame(self.column, fg_color=pair("bg"))
+        block.pack(fill="x", pady=(0 if first else 28, 0))
+        self._add_label(block, key, font=ui_font(14), text_color=pair("text"), anchor="w", height=17).pack(
+            anchor="w", pady=(0, 8)
         )
         return block
 
@@ -349,22 +382,28 @@ class SettingsPage(ctk.CTkFrame):
             corner_radius=8,
             bg_color=pair("bg"),
         )
-        card.pack(fill="x", pady=2)
+        card.pack(fill="x", pady=(0, 4))
         card.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(card, text="", image=icon_image(icon_name, 20, "muted")).grid(
-            row=0, column=0, padx=(12, 12), pady=8
+        one_line = desc_key is None and not path_subtitle
+        if one_line:
+            card.grid_rowconfigure(0, minsize=64)
+            pad_y = 0
+        else:
+            pad_y = 16
+        ctk.CTkLabel(card, text="", image=svg_image(_ROW_ICONS[icon_name], 20, "muted")).grid(
+            row=0, column=0, padx=(16, 14), pady=pad_y
         )
         words = ctk.CTkFrame(card, fg_color="transparent")
-        words.grid(row=0, column=1, sticky="ew", pady=(8, 8))
+        words.grid(row=0, column=1, sticky="ew", pady=pad_y)
         title = self._add_label(
-            words, title_key, font=ui_font(13), text_color=pair("text"), anchor="w", height=18
+            words, title_key, font=ui_font(14), text_color=pair("text"), anchor="w", height=18
         )
         title.pack(anchor="w")
         if path_subtitle:
             desc = ctk.CTkLabel(
                 words, text="", font=ui_font(12), text_color=pair("muted"), anchor="w", justify="left", height=16
             )
-            desc.pack(anchor="w", pady=(1, 0))
+            desc.pack(anchor="w", pady=(2, 0))
         elif desc_key:
             desc = self._add_label(
                 words,
@@ -375,35 +414,47 @@ class SettingsPage(ctk.CTkFrame):
                 justify="left",
                 height=16,
             )
-            desc.pack(anchor="w", pady=(1, 0))
+            desc.pack(anchor="w", pady=(2, 0))
         else:
             desc = None
         controls = ctk.CTkFrame(card, fg_color="transparent")
-        controls.grid(row=0, column=2, padx=(8, 12), pady=8, sticky="e")
+        controls.grid(row=0, column=2, padx=(10, 16), pady=pad_y, sticky="e")
         return controls, title, desc
 
-    def _value_row(self, parent, icon_name, title_key, desc_key, boxed: bool, command):
+    def _value_row(self, parent, icon_name, title_key, desc_key, boxed: bool, command, width: int | None = None):
         controls, _title, _desc = self._card(parent, icon_name, title_key, desc_key)
-        return self._value_control(controls, boxed, command)
+        return self._value_control(controls, boxed, command, width=width)
 
-    def _value_control(self, card, boxed: bool, command) -> ctk.CTkLabel:
+    def _value_control(self, card, boxed: bool, command, width: int | None = None) -> ctk.CTkLabel:
         if boxed:
             host = ctk.CTkFrame(
                 card,
-                fg_color=pair("input_bg"),
-                border_color=pair("input_border"),
+                fg_color=pair("secondary_bg"),
+                border_color=pair("ctl_stroke"),
                 border_width=1,
                 corner_radius=4,
+                height=32,
             )
             text_color = pair("text")
+            if width is not None:
+                host.configure(width=width)
+                host.pack_propagate(False)
+            edge = ctk.CTkFrame(host, height=1, fg_color=pair("ctl_stroke2"), corner_radius=0)
+            edge.place(relx=0, rely=1.0, relwidth=1, anchor="sw", y=-1)
+            chevron_name, chevron_size = "chevron_down_14", 14
+            label_pad = (12, 8)
+            chevron_pad = (0, 10)
         else:
             host = ctk.CTkFrame(card, fg_color="transparent")
             text_color = pair("muted")
+            chevron_name, chevron_size = "chevron_down", 16
+            label_pad = (0, 8)
+            chevron_pad = (0, 0)
         host.pack(side="left")
-        label = ctk.CTkLabel(host, text="", font=ui_font(13), text_color=text_color)
-        label.pack(side="left", padx=(10, 4), pady=4)
-        chevron = ctk.CTkLabel(host, text="", image=icon_image("chevron_down", 14, "muted"))
-        chevron.pack(side="left", padx=(0, 8))
+        label = ctk.CTkLabel(host, text="", font=ui_font(13), text_color=text_color, height=30)
+        label.pack(side="left", padx=label_pad)
+        chevron = ctk.CTkLabel(host, text="", image=svg_image(chevron_name, chevron_size, "muted"))
+        chevron.pack(side="left", padx=chevron_pad)
         for widget in (host, label, chevron):
             widget.bind("<Button-1>", lambda _event, cb=command, anchor=host: cb(anchor))
             widget.configure(cursor="hand2")
@@ -413,19 +464,24 @@ class SettingsPage(ctk.CTkFrame):
         controls, _title, _desc = self._card(parent, "drop", "settings.color_default", "settings.color_default.desc")
         host = ctk.CTkFrame(
             controls,
-            fg_color=pair("input_bg"),
-            border_color=pair("input_border"),
+            fg_color=pair("secondary_bg"),
+            border_color=pair("ctl_stroke"),
             border_width=1,
             corner_radius=4,
+            height=32,
+            width=140,
         )
         host.pack(side="left")
-        swatch = ctk.CTkFrame(host, width=16, height=16, corner_radius=3)
-        swatch.pack(side="left", padx=(10, 6), pady=8)
+        host.pack_propagate(False)
+        edge = ctk.CTkFrame(host, height=1, fg_color=pair("ctl_stroke2"), corner_radius=0)
+        edge.place(relx=0, rely=1.0, relwidth=1, anchor="sw", y=-1)
+        swatch = ctk.CTkFrame(host, width=16, height=16, corner_radius=4, border_width=1, border_color=pair("ctl_stroke"))
+        swatch.pack(side="left", padx=(12, 8))
         swatch.pack_propagate(False)
         label = ctk.CTkLabel(host, text="", font=ui_font(13), text_color=pair("text"))
-        label.pack(side="left", padx=(0, 4))
-        chevron = ctk.CTkLabel(host, text="", image=icon_image("chevron_down", 14, "muted"))
-        chevron.pack(side="left", padx=(0, 8))
+        label.pack(side="left", padx=(0, 8))
+        chevron = ctk.CTkLabel(host, text="", image=svg_image("chevron_down_14", 14, "muted"))
+        chevron.pack(side="left", padx=(0, 10))
         for widget in (host, label, chevron, swatch):
             widget.bind("<Button-1>", lambda _event, anchor=host: self._open_color(anchor))
             widget.configure(cursor="hand2")
@@ -439,60 +495,26 @@ class SettingsPage(ctk.CTkFrame):
         switch.pack(side="left")
         return caption, switch
 
-    def _switch(self, master, command) -> ctk.CTkSwitch:
-        switch = ctk.CTkSwitch(
-            master,
-            text="",
-            width=52,
-            height=28,
-            switch_width=46,
-            switch_height=24,
-            border_width=2,
-            corner_radius=12,
-            border_color=("#6A6A6A", "#B0B0B0"),
-            fg_color=("#FFFFFF", "#1A1A1A"),
-            progress_color=pair("accent"),
-            button_color=("#1A1A1A", "#F2F2F2"),
-            button_hover_color=("#1A1A1A", "#F2F2F2"),
-            command=lambda: self._after_switch(switch, command),
-        )
-        return switch
+    def _switch(self, master, command) -> Toggle:
+        return Toggle(master, command=command)
 
-    def _after_switch(self, switch: ctk.CTkSwitch, command) -> None:
-        self._paint_switch(switch, bool(switch.get()))
-        command()
-
-    def _paint_switch(self, switch: ctk.CTkSwitch, on: bool) -> None:
-        if on:
-            switch.configure(
-                button_color=("#FFFFFF", "#102030"),
-                border_width=0,
-                progress_color=pair("accent"),
-            )
-        else:
-            switch.configure(
-                button_color=("#1A1A1A", "#F2F2F2"),
-                border_width=2,
-                border_color=("#6A6A6A", "#B0B0B0"),
-                fg_color=("#FFFFFF", "#1A1A1A"),
-                progress_color=("#FFFFFF", "#1A1A1A"),
-            )
-
-    def _button(self, master, key: str, command) -> ctk.CTkButton:
-        button = ctk.CTkButton(
+    def _button(self, master, key: str, command) -> EdgedButton:
+        button = EdgedButton(
             master,
             text="",
             height=32,
             corner_radius=4,
+            border_spacing=0,
+            border_width=1,
             font=ui_font(13),
             fg_color=pair("secondary_bg"),
             hover_color=pair("secondary_hover"),
-            border_color=pair("secondary_border"),
-            border_width=1,
+            border_color=pair("ctl_stroke"),
+            bottom_color=pair("ctl_stroke2"),
             text_color=pair("text"),
             command=command,
         )
-        button.pack(side="left", padx=(0, 8))
+        button.pack(side="left", padx=(0, 10))
         self._labels.append((button, key))
         return button
 
@@ -504,11 +526,11 @@ class SettingsPage(ctk.CTkFrame):
     def _toggle_about(self) -> None:
         self._about_open = not self._about_open
         if self._about_open:
-            self.about_body.pack(fill="x", padx=(62, 16), pady=(0, 8))
-            self.about_chevron.configure(image=icon_image("chevron_up", 16, "muted"))
+            self.about_body.pack(fill="x")
+            self.about_chevron.configure(image=svg_image("chevron_up", 16, "muted"))
         else:
             self.about_body.pack_forget()
-            self.about_chevron.configure(image=icon_image("chevron_down", 16, "muted"))
+            self.about_chevron.configure(image=svg_image("chevron_down", 16, "muted"))
 
     def _open_theme(self, anchor) -> None:
         self._choice_popup(anchor, list(_THEME_KEYS), self.controller.settings["theme"], self.controller.set_theme)
@@ -735,14 +757,21 @@ class SettingsPage(ctk.CTkFrame):
         entry.delete(0, "end")
         entry.insert(0, value)
 
-    def _sync_switch(self, switch: ctk.CTkSwitch, on: bool) -> None:
-        # select/deselect can invoke the command; write the variable directly.
+    def _fit_auto_combos(self) -> None:
+        """Language and «if exists» combos shrink to their text and stay 32 px tall."""
+        for label in (self.language_value, self.exists_value):
+            host = label.master
+            host.update_idletasks()
+            width = 12 + label.winfo_reqwidth() + 8 + 14 + 10
+            host.configure(width=max(width, 48), height=32)
+            host.pack_propagate(False)
+
+    def _sync_switch(self, switch: Toggle, on: bool) -> None:
         if bool(switch.get()) != on:
             if on:
                 switch.select()
             else:
                 switch.deselect()
-        self._paint_switch(switch, on)
 
     def _open_license(self) -> None:
         path = license_path()
@@ -752,13 +781,7 @@ class SettingsPage(ctk.CTkFrame):
             self._on_open_url(URL_GPL)
 
     def _app_logo(self):
-        import customtkinter as ctk
-        from PIL import Image
-
-        from signature_extractor.paths import app_icon_path
-
-        image = Image.open(app_icon_path()).convert("RGBA").resize((32, 32))
-        self._logo = ctk.CTkImage(light_image=image, dark_image=image, size=(32, 32))
+        self._logo = svg_image("app_icon_32", 32)
         return self._logo
 
     def _center_column(self, _event=None) -> None:
@@ -775,7 +798,7 @@ class SettingsPage(ctk.CTkFrame):
         if key == self._layout_key:
             return
         self._layout_key = key
-        self.column.grid_configure(padx=side, pady=(0, 24))
+        self.column.grid_configure(padx=side, pady=(0, 32))
         if self.folder_path is not None:
             self.folder_path.configure(wraplength=max(180, content - 360))
 

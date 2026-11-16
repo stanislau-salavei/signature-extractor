@@ -8,7 +8,8 @@ import customtkinter as ctk
 
 from signature_extractor.ui.theme import Palette, current_palette, pair
 
-_RADIUS = 12
+# CSS radius 8. Drawn in physical pixels, so it is multiplied by the DPI scale.
+_RADIUS = 8
 
 
 class DropZone(ctk.CTkFrame):
@@ -42,21 +43,22 @@ class DropZone(ctk.CTkFrame):
         canvas = self._canvas
         canvas.configure(bg=palette.bg)
         canvas.delete("all")
-        inset = 2
+        inset = 1
         try:
             scale = max(float(self.winfo_fpixels("1i")) / 96.0, 1.0)
         except tk.TclError:
             scale = 1.0
-        # At 150 % a 4 px dash collapses into dots. Scale the pattern with DPI.
-        dash = (max(6, int(round(10 * scale))), max(4, int(round(7 * scale))))
-        stroke = max(2, int(round(1.75 * scale)))
+        # Spec: 3 CSS px on, 2 CSS px off, 1.5 px stroke. Tk strokes are whole pixels.
+        dash = (max(1, int(round(3 * scale))), max(1, int(round(2 * scale))))
+        stroke = max(1, int(round(1.5 * scale)))
+        radius = max(1, int(round(_RADIUS * scale)))
         _fill_round_rect(
             canvas,
             inset,
             inset,
             width - inset,
             height - inset,
-            _RADIUS,
+            radius,
             palette.drop,
         )
         _stroke_round_rect(
@@ -65,7 +67,7 @@ class DropZone(ctk.CTkFrame):
             inset,
             width - inset,
             height - inset,
-            _RADIUS,
+            radius,
             palette.drop_border,
             dash,
             stroke,

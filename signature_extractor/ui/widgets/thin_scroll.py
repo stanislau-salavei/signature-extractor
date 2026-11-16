@@ -29,11 +29,13 @@ def wheel_steps(delta: int, number: int | None = None) -> int:
 
 class ThinScroll(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master, fg_color="transparent", bg_color=pair("bg"))
+        super().__init__(master, fg_color=pair("bg"), bg_color=pair("bg"))
         palette = current_palette()
         self.canvas = tk.Canvas(self, highlightthickness=0, bd=0, bg=palette.bg, yscrollincrement=1)
         self.canvas.pack(fill="both", expand=True)
-        self.content = ctk.CTkFrame(self.canvas, fg_color="transparent", bg_color=pair("bg"))
+        # A transparent frame over a Tk canvas resolves to white. Paint the
+        # window colour explicitly so dark mode stays #202020.
+        self.content = ctk.CTkFrame(self.canvas, fg_color=pair("bg"), bg_color=pair("bg"))
         self._window = self.canvas.create_window((0, 0), window=self.content, anchor="nw")
         self.bar = tk.Canvas(self, width=8, highlightthickness=0, bd=0, bg=palette.bg)
         self.content.bind("<Configure>", self._on_content)
@@ -47,8 +49,10 @@ class ThinScroll(ctk.CTkFrame):
 
     def apply_colors(self) -> None:
         palette = current_palette()
+        self.configure(fg_color=pair("bg"))
         self.canvas.configure(bg=palette.bg)
         self.bar.configure(bg=palette.bg)
+        self.content.configure(fg_color=pair("bg"), bg_color=pair("bg"))
         self._place_thumb()
 
     def _watch(self) -> None:
@@ -111,19 +115,26 @@ class ThinScroll(ctk.CTkFrame):
             return
         first, last = self.canvas.yview()
         span = max(last - first, 0.05)
-        thumb_h = max(28, int(view_h * span))
-        thumb_h = min(thumb_h, view_h - 4)
-        travel = max(view_h - thumb_h, 1)
-        thumb_y = int(first / max(1 - span, 0.001) * travel) if last < 0.999 else view_h - thumb_h
-        thumb_y = max(0, min(thumb_y, view_h - thumb_h))
+        # Track is inset 8 px from the scroll top and bottom. Thumb is 5 px
+        # wide and sits 6 px from the window edge (3 px inside a 12 px track).
+        inset = 8
+        track_h = max(view_h - inset * 2, 1)
+        thumb_h = max(28, int(track_h * span))
+        thumb_h = min(thumb_h, track_h)
+        travel = max(track_h - thumb_h, 1)
+        thumb_y = int(first / max(1 - span, 0.001) * travel) if last < 0.999 else track_h - thumb_h
+        thumb_y = max(0, min(thumb_y, track_h - thumb_h))
         palette = current_palette()
-        color = "#8A8A8A" if palette is not None and palette.bg == "#F3F3F3" else "#6E6E6E"
         self.bar.configure(bg=palette.bg)
-        self.bar.place(relx=1.0, rely=0, relheight=1, anchor="ne", width=8)
+        self.bar.place(relx=1.0, y=inset, anchor="ne", width=12, height=track_h)
         self.bar.delete("all")
-        radius = 2
-        x0, x1 = 3, 6
-        y0, y1 = thumb_y + 2, thumb_y + thumb_h - 2
+        color = palette.scroll_thumb
+        x0, x1 = 4, 9
+        y0, y1 = thumb_y, thumb_y + thumb_h
+        radius = 3
+        if y1 - y0 <= radius * 2:
+            self.bar.create_oval(x0, y0, x1, y1, fill=color, outline=color)
+            return
         self.bar.create_rectangle(x0, y0 + radius, x1, y1 - radius, fill=color, outline=color)
         self.bar.create_oval(x0, y0, x1, y0 + radius * 2, fill=color, outline=color)
         self.bar.create_oval(x0, y1 - radius * 2, x1, y1, fill=color, outline=color)

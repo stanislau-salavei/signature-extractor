@@ -13,8 +13,7 @@ from PIL import Image, ImageTk
 from signature_extractor import __version__
 from signature_extractor.controller.state import AppController
 from signature_extractor.paths import app_icon_path, license_path
-from signature_extractor.ui.fonts import ui_scale
-from signature_extractor.ui.icons import icon_image, pil_icon
+from signature_extractor.ui.svg_icons import svg_image
 from signature_extractor.ui.popup import BorderlessPopup
 from signature_extractor.ui.pages.help_page import HelpPage
 from signature_extractor.ui.pages.import_page import ImportPage
@@ -65,7 +64,9 @@ class MainWindow(ctk.CTk):
         self.shell.grid(row=0, column=0, sticky="ew")
         self.shell.grid_propagate(False)
         self.stepper = Stepper(self.shell, self._on_step)
-        self.stepper.place(relx=0.5, rely=0.5, anchor="center")
+        # The track is centred in the header space left of ⋯, 26 px left of
+        # the window centre. The button's right edge is 24 px from the window.
+        self.stepper.place(relx=0.5, x=-26, rely=0.5, anchor="center")
         self.more = ctk.CTkButton(
             self.shell,
             text="",
@@ -74,10 +75,10 @@ class MainWindow(ctk.CTk):
             corner_radius=4,
             fg_color="transparent",
             hover_color=pair("menu_hover"),
-            image=icon_image("dots", 20, "text"),
+            image=svg_image("more_horizontal_20", 20, "text"),
             command=self._toggle_menu,
         )
-        self.more.place(relx=1.0, x=-12, rely=0.5, anchor="e")
+        self.more.place(relx=1.0, x=-24, rely=0.5, anchor="e")
         Tooltip(self.more, lambda: self.controller.text("shell.more"))
         self.menu = OverflowMenu(self)
 
@@ -155,25 +156,17 @@ class MainWindow(ctk.CTk):
         if self.menu.is_open():
             self.menu.hide()
             return
-        from signature_extractor.ui.theme import current_palette
-
-        palette = current_palette()
         specs = (
-            ("menu.open_file", "image", self.open_file_dialog),
-            ("menu.add_folder", "folder", self.open_folder_dialog),
-            ("menu.settings", "gear", self.controller.open_settings),
-            ("menu.help", "help", self.show_help),
-            ("menu.about", "info", self.show_about),
+            ("menu.open_file", "menu_open_file", self.open_file_dialog),
+            ("menu.add_folder", "menu_add_folder", self.open_folder_dialog),
+            ("menu.settings", "menu_settings_gear", self.controller.open_settings),
+            ("menu.help", "menu_help", self.show_help),
+            ("menu.about", "menu_about", self.show_about),
         )
-        self._menu_images = []
-        items = []
-        icon_px = max(16, int(round(16 * ui_scale(self))))
-        for key, icon_name, command in specs:
-            image = ImageTk.PhotoImage(pil_icon(icon_name, icon_px, "text", palette))
-            self._menu_images.append(image)
-            items.append((self.controller.text(key), image, command))
+        items = [(self.controller.text(key), icon, command) for key, icon, command in specs]
         self.menu.set_items(items)
-        # Right edge lines up with the drop zone, not with the button.
+        # Right edge of the card lines up with the drop zone. The mockup DOM
+        # is 4 px further right; that offset is intentionally not applied.
         self.menu.show(self.more, align_right=self.import_page.drop)
 
     def open_file_dialog(self) -> None:
