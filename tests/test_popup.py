@@ -7,6 +7,7 @@ import sys
 import unittest
 
 from signature_extractor.ui.popup import popup_position
+from signature_extractor.ui.widgets.thin_scroll import wheel_steps
 from signature_extractor.ui.theme import DARK, LIGHT
 from signature_extractor.ui.widgets.drop_zone import canvas_colors
 
@@ -32,6 +33,12 @@ class PopupPositionTests(unittest.TestCase):
     def test_flips_above_when_there_is_no_room_below(self) -> None:
         _x, y = popup_position(100, 500, 36, 36, 228, 180, (0, 0, 800, 600))
         self.assertEqual(y, 500 - 180 - 4)
+
+    def test_windows_wheel_delta_is_a_notch_of_120(self) -> None:
+        self.assertEqual(wheel_steps(120), -48)
+        self.assertEqual(wheel_steps(-240), 96)
+        self.assertEqual(wheel_steps(0, number=4), -48)
+        self.assertEqual(wheel_steps(0, number=5), 48)
 
     def test_drop_canvas_uses_the_window_colour_outside_the_curve(self) -> None:
         self.assertEqual(canvas_colors(LIGHT), ("#F3F3F3", "#FBFBFB"))
@@ -137,12 +144,9 @@ class WidgetChromeTests(unittest.TestCase):
         self.assertTrue(popup.winfo_viewable())
         self.assertGreater(popup.winfo_width(), 100)
         self.assertGreater(popup.winfo_height(), 40)
-        self.assertAlmostEqual(
-            popup.winfo_rootx() + popup.winfo_width(),
-            anchor.winfo_rootx() + anchor.winfo_width(),
-            delta=20,
-        )
-        self.assertGreaterEqual(popup.winfo_rooty(), anchor.winfo_rooty() + anchor.winfo_height() - 2)
+        button_bottom = anchor.winfo_rooty() + anchor.winfo_height()
+        self.assertLess(popup.winfo_rooty(), button_bottom + 24)
+        self.assertGreater(popup.winfo_rooty() + popup.winfo_height(), button_bottom)
 
         popup.event_generate("<Escape>")
         self.root.update()

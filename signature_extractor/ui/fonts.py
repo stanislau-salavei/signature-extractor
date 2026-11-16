@@ -26,8 +26,34 @@ def family() -> str:
     return _FAMILY
 
 
+def _families() -> set[str]:
+    try:
+        return set(tkfont.families())
+    except tkinter.TclError:
+        return set()
+
+
+def semibold(size: int) -> ctk.CTkFont:
+    """Segoe UI Semibold (Windows) rather than the heavier Bold weight."""
+    names = _families()
+    for candidate in ("Segoe UI Semibold", "Segoe UI SemiBold", "Inter Semi Bold", "Inter Medium"):
+        if candidate in names:
+            return ctk.CTkFont(family=candidate, size=size, weight="normal")
+    return ctk.CTkFont(family=family(), size=size, weight="normal")
+
+
 def ui_font(size: int, weight: str = "normal") -> ctk.CTkFont:
-    return ctk.CTkFont(family=family(), size=size, weight=weight)
+    if weight == "bold":
+        return semibold(size)
+    return ctk.CTkFont(family=family(), size=size, weight="normal")
+
+
+def ui_scale(widget) -> float:
+    """Pixels per logical pixel. 1 at 100 %, about 1.25 or 1.5 when Windows scales."""
+    try:
+        return max(float(widget.winfo_fpixels("1i")) / 96.0, 1.0)
+    except tkinter.TclError:
+        return 1.0
 
 
 def text_width(size: int, text: str, weight: str = "normal") -> int:
@@ -36,3 +62,13 @@ def text_width(size: int, text: str, weight: str = "normal") -> int:
         return int(measured.measure(text))
     except tkinter.TclError:
         return max(80, len(text) * size)
+
+
+def logical_text_width(widget, size: int, text: str, weight: str = "normal") -> int:
+    """Text width in the same logical pixels CustomTkinter uses for widget width.
+
+    On a DPI-aware Windows process, Tk measures fonts in physical pixels while
+    CTk multiplies a logical width by the same scale. Dividing keeps a button
+    from growing twice.
+    """
+    return max(1, int(round(text_width(size, text, weight) / ui_scale(widget))))

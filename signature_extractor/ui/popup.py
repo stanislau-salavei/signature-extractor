@@ -119,6 +119,53 @@ class BorderlessPopup:
         except tk.TclError:
             return False
 
+    def reveal_body(
+        self,
+        anchor: tk.Widget,
+        *,
+        body_width: int,
+        body_height: int,
+        align_right: tk.Widget | None = None,
+        gap: int = 0,
+        margin: int = 0,
+    ) -> None:
+        """Show the window so the menu body (inside ``margin``) sits under the anchor.
+
+        ``align_right`` is the widget whose right edge the menu body should
+        share — the drop zone, not the ⋯ button, which sits further right.
+        """
+        if not self.is_open():
+            return
+        self._anchor = anchor
+        _ax, ay, _aw, ah = widget_screen_rect(anchor)
+        if align_right is not None:
+            rx, _ry, rw, _rh = widget_screen_rect(align_right)
+            body_right = rx + rw
+        else:
+            ax, _ay, aw, _ah = widget_screen_rect(anchor)
+            body_right = ax + aw
+        body_x = body_right - body_width
+        body_y = ay + ah + gap
+        screen = screen_bounds(anchor)
+        body_x, body_y = popup_position(
+            body_x,
+            body_y - gap - ah,
+            body_width,
+            ah,
+            body_width,
+            body_height,
+            screen,
+            gap=gap,
+        )
+        self._map(body_x - margin, body_y - margin, body_width + margin * 2, body_height + margin * 2)
+        self._armed = False
+        if self._arm_job is not None:
+            try:
+                self.master.after_cancel(self._arm_job)
+            except tk.TclError:
+                pass
+        self._arm_job = self.master.after(0, self._arm)
+
     def reveal_under(self, anchor: tk.Widget, *, min_width: int = 0, min_height: int = 0) -> None:
         """Show the window under ``anchor`` after its contents have been packed."""
         if not self.is_open():

@@ -151,11 +151,15 @@ class Stepper(ctk.CTkFrame):
             underline = step["underline"]
             badge.set_active(is_active)
             if is_active:
-                chip.configure(fg_color=pair("stepper_chip"))
+                chip.configure(
+                    fg_color=pair("stepper_chip"),
+                    border_width=1,
+                    border_color=("#E4E4E4", "#4A4A4A"),
+                )
                 label.configure(font=self._font_active, text_color=pair("text"))
                 underline.pack(pady=(3, 0))
             else:
-                chip.configure(fg_color="transparent")
+                chip.configure(fg_color="transparent", border_width=0)
                 label.configure(font=self._font, text_color=pair("muted"))
                 underline.pack_forget()
             targets = (chip, label, badge, badge.number)

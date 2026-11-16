@@ -13,6 +13,7 @@ from PIL import Image, ImageTk
 from signature_extractor import __version__
 from signature_extractor.controller.state import AppController
 from signature_extractor.paths import app_icon_path, license_path
+from signature_extractor.ui.fonts import ui_scale
 from signature_extractor.ui.icons import icon_image, pil_icon
 from signature_extractor.ui.popup import BorderlessPopup
 from signature_extractor.ui.pages.help_page import HelpPage
@@ -166,12 +167,14 @@ class MainWindow(ctk.CTk):
         )
         self._menu_images = []
         items = []
+        icon_px = max(16, int(round(16 * ui_scale(self))))
         for key, icon_name, command in specs:
-            image = ImageTk.PhotoImage(pil_icon(icon_name, 16, "text", palette))
+            image = ImageTk.PhotoImage(pil_icon(icon_name, icon_px, "text", palette))
             self._menu_images.append(image)
             items.append((self.controller.text(key), image, command))
         self.menu.set_items(items)
-        self.menu.show(self.more)
+        # Right edge lines up with the drop zone, not with the button.
+        self.menu.show(self.more, align_right=self.import_page.drop)
 
     def open_file_dialog(self) -> None:
         if not self.controller.confirm_discard():

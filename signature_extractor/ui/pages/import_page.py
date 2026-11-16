@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import customtkinter as ctk
 
-from signature_extractor.ui.fonts import text_width, ui_font
+from signature_extractor.ui.fonts import logical_text_width, ui_font
 from signature_extractor.ui.icons import icon_image
 from signature_extractor.ui.theme import pair
 from signature_extractor.ui.tooltip import Tooltip
@@ -45,7 +45,8 @@ class ImportPage(ctk.CTkFrame):
         self.title = ctk.CTkLabel(
             self.drop.inner,
             text="",
-            font=ui_font(24, "bold"),
+            font=ui_font(26, "bold"),
+            height=34,
             text_color=pair("text"),
         )
         self.title.pack(pady=(16, 0))
@@ -107,7 +108,7 @@ class ImportPage(ctk.CTkFrame):
         )
         badge.grid(row=0, column=0, padx=(16, 0), pady=(14, 0), sticky="n")
         body = ctk.CTkFrame(tips, fg_color="transparent")
-        body.grid(row=0, column=1, sticky="ew", padx=(14, 18), pady=14)
+        body.grid(row=0, column=1, sticky="ew", padx=(12, 16), pady=(10, 8))
         tips.grid_columnconfigure(1, weight=1)
 
         self.tips_title = ctk.CTkLabel(
@@ -116,8 +117,9 @@ class ImportPage(ctk.CTkFrame):
             anchor="w",
             font=ui_font(13, "bold"),
             text_color=pair("text"),
+            height=18,
         )
-        self.tips_title.pack(anchor="w", pady=(0, 3))
+        self.tips_title.pack(anchor="w", pady=(0, 1))
         self.tip_lines: list[ctk.CTkLabel] = []
         for key in ("import.tip_phone", "import.tip_closeup", "import.tip_background"):
             label = ctk.CTkLabel(
@@ -125,30 +127,33 @@ class ImportPage(ctk.CTkFrame):
                 text="",
                 anchor="w",
                 justify="left",
-                font=ui_font(13),
+                font=ui_font(12),
                 text_color=pair("muted"),
+                height=16,
             )
             label._string_key = key  # type: ignore[attr-defined]
-            label.pack(anchor="w", pady=1)
+            label.pack(anchor="w", pady=0)
             self.tip_lines.append(label)
         self.supported = ctk.CTkLabel(
             body,
             text="",
             anchor="w",
             justify="left",
-            font=ui_font(13),
+            font=ui_font(12),
             text_color=pair("muted"),
+            height=16,
         )
-        self.supported.pack(anchor="w", pady=(6, 0))
+        self.supported.pack(anchor="w", pady=(4, 0))
         self.how_to = ctk.CTkLabel(
             body,
             text="",
             anchor="w",
-            font=ui_font(13, "bold"),
+            font=ui_font(12, "bold"),
             text_color=pair("accent"),
+            height=16,
             cursor="hand2",
         )
-        self.how_to.pack(anchor="w", pady=(7, 0))
+        self.how_to.pack(anchor="w", pady=(4, 0))
         self.how_to.bind("<Button-1>", lambda _event: on_how_to())
         tips.bind("<Configure>", self._wrap)
 
@@ -157,8 +162,10 @@ class ImportPage(ctk.CTkFrame):
         self.title.configure(text=text("import.drop_title"))
         open_label = text("menu.open_file")
         folder_label = text("import.batch_folder")
-        self.open_button.configure(text=open_label, width=text_width(14, open_label) + 72)
-        self.folder_button.configure(text=folder_label, width=text_width(14, folder_label) + 72)
+        # Icon 17, gap 8, 16 px of padding on each side. Width is logical so
+        # Windows DPI does not apply the scale a second time.
+        self.open_button.configure(text=open_label, width=logical_text_width(self, 14, open_label) + 57)
+        self.folder_button.configure(text=folder_label, width=logical_text_width(self, 14, folder_label) + 57)
         self.tips_title.configure(text=text("import.tips_title"))
         for label in self.tip_lines:
             label.configure(text=text(label._string_key))  # type: ignore[attr-defined]

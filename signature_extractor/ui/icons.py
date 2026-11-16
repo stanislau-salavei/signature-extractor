@@ -67,6 +67,23 @@ def _render(name: str, size: int, color: str) -> Image.Image:
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
+def _gear(draw: ImageDraw.ImageDraw, scale: int, pen: int, color: str) -> None:
+    """Eight-tooth cog. The old tick marks read as a dotted sun at 16 px."""
+    import math
+
+    center = 12 * scale
+    teeth = 8
+    points: list[tuple[float, float]] = []
+    for index in range(teeth):
+        base = math.radians(index * (360 / teeth) - 90)
+        for delta, radius in ((-0.22, 6.4), (-0.11, 9.4), (0.11, 9.4), (0.22, 6.4)):
+            angle = base + delta
+            points.append((center + radius * scale * math.cos(angle), center + radius * scale * math.sin(angle)))
+    draw.line(points + [points[0]], fill=color, width=pen, joint="curve")
+    hole = 2.6 * scale
+    draw.ellipse((center - hole, center - hole, center + hole, center + hole), outline=color, width=pen)
+
+
 def _draw(name: str, draw: ImageDraw.ImageDraw, scale: int, pen: int, color: str) -> None:
     def xy(*points: tuple[float, float]) -> list[tuple[float, float]]:
         return [(x * scale, y * scale) for x, y in points]
@@ -100,18 +117,7 @@ def _draw(name: str, draw: ImageDraw.ImageDraw, scale: int, pen: int, color: str
         for center in (6, 12, 18):
             ellipse((center - 1.3, 10.7, center + 1.3, 13.3), fill=color)
     elif name == "gear":
-        ellipse((8, 8, 16, 16))
-        for x1, y1, x2, y2 in (
-            (11, 2, 13, 6),
-            (11, 18, 13, 22),
-            (2, 11, 6, 13),
-            (18, 11, 22, 13),
-            (4.2, 4.2, 7.2, 7.2),
-            (16.8, 16.8, 19.8, 19.8),
-            (16.8, 4.2, 19.8, 7.2),
-            (4.2, 16.8, 7.2, 19.8),
-        ):
-            line((x1, y1), (x2, y2))
+        _gear(draw, scale, pen, color)
     elif name == "help":
         ellipse((3, 3, 21, 21))
         arc((8, 6.5, 16, 13), 200, 280)

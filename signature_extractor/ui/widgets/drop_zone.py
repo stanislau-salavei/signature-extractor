@@ -43,6 +43,13 @@ class DropZone(ctk.CTkFrame):
         canvas.configure(bg=palette.bg)
         canvas.delete("all")
         inset = 2
+        try:
+            scale = max(float(self.winfo_fpixels("1i")) / 96.0, 1.0)
+        except tk.TclError:
+            scale = 1.0
+        # At 150 % a 4 px dash collapses into dots. Scale the pattern with DPI.
+        dash = (max(6, int(round(10 * scale))), max(4, int(round(7 * scale))))
+        stroke = max(2, int(round(1.75 * scale)))
         _fill_round_rect(
             canvas,
             inset,
@@ -60,6 +67,8 @@ class DropZone(ctk.CTkFrame):
             height - inset,
             _RADIUS,
             palette.drop_border,
+            dash,
+            stroke,
         )
 
 
@@ -89,17 +98,18 @@ def _stroke_round_rect(
     y2: int,
     radius: int,
     color: str,
+    dash: tuple[int, int] = (10, 7),
+    stroke: int = 2,
 ) -> None:
     radius = min(radius, max(0, (x2 - x1) // 2), max(0, (y2 - y1) // 2))
-    dash = (7, 5)
-    canvas.create_line(x1 + radius, y1, x2 - radius, y1, fill=color, width=2, dash=dash)
-    canvas.create_line(x2, y1 + radius, x2, y2 - radius, fill=color, width=2, dash=dash)
-    canvas.create_line(x2 - radius, y2, x1 + radius, y2, fill=color, width=2, dash=dash)
-    canvas.create_line(x1, y2 - radius, x1, y1 + radius, fill=color, width=2, dash=dash)
-    _corner(canvas, x1, y1, radius, 90, color, filled=False)
-    _corner(canvas, x2 - 2 * radius, y1, radius, 0, color, filled=False)
-    _corner(canvas, x1, y2 - 2 * radius, radius, 180, color, filled=False)
-    _corner(canvas, x2 - 2 * radius, y2 - 2 * radius, radius, 270, color, filled=False)
+    canvas.create_line(x1 + radius, y1, x2 - radius, y1, fill=color, width=stroke, dash=dash)
+    canvas.create_line(x2, y1 + radius, x2, y2 - radius, fill=color, width=stroke, dash=dash)
+    canvas.create_line(x2 - radius, y2, x1 + radius, y2, fill=color, width=stroke, dash=dash)
+    canvas.create_line(x1, y2 - radius, x1, y1 + radius, fill=color, width=stroke, dash=dash)
+    _corner(canvas, x1, y1, radius, 90, color, filled=False, dash=dash, stroke=stroke)
+    _corner(canvas, x2 - 2 * radius, y1, radius, 0, color, filled=False, dash=dash, stroke=stroke)
+    _corner(canvas, x1, y2 - 2 * radius, radius, 180, color, filled=False, dash=dash, stroke=stroke)
+    _corner(canvas, x2 - 2 * radius, y2 - 2 * radius, radius, 270, color, filled=False, dash=dash, stroke=stroke)
 
 
 def _corner(
@@ -111,6 +121,8 @@ def _corner(
     color: str,
     *,
     filled: bool,
+    dash: tuple[int, int] = (10, 7),
+    stroke: int = 2,
 ) -> None:
     box = (x, y, x + 2 * radius, y + 2 * radius)
     if filled:
@@ -122,8 +134,8 @@ def _corner(
             extent=90,
             style="arc",
             outline=color,
-            width=2,
-            dash=(7, 5),
+            width=stroke,
+            dash=dash,
         )
 
 

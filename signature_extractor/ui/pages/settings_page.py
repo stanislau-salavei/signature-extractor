@@ -102,15 +102,12 @@ class SettingsPage(ctk.CTkFrame):
         )
         self.title.place(x=56, rely=0.5, anchor="w")
 
-        self.scroll = ctk.CTkScrollableFrame(
-            self,
-            fg_color="transparent",
-            scrollbar_button_color=pair("number_off"),
-            scrollbar_button_hover_color=pair("muted"),
-        )
+        from signature_extractor.ui.widgets.thin_scroll import ThinScroll
+
+        self.scroll = ThinScroll(self)
         self.scroll.grid(row=1, column=0, sticky="nsew")
-        self.scroll.grid_columnconfigure(0, weight=1)
-        self.column = ctk.CTkFrame(self.scroll, fg_color="transparent")
+        self.scroll.content.grid_columnconfigure(0, weight=1)
+        self.column = ctk.CTkFrame(self.scroll.content, fg_color="transparent")
         self.column.grid(row=0, column=0, sticky="ew")
         self._layout_key: tuple[int, int] | None = None
         self.scroll.bind("<Configure>", self._center_column)
@@ -147,6 +144,7 @@ class SettingsPage(ctk.CTkFrame):
         self.gpu_caption.configure(text=text("common.on" if self.controller.settings["gpu_acceleration"] else "common.off"))
         self.updates_caption.configure(text=text("common.on" if self.controller.settings["check_updates"] else "common.off"))
         self.version_label.configure(text=__version__)
+        self.scroll.apply_colors()
         self._sync_switch(self.ai_switch, self.controller.settings["ai_default"])
         self._sync_switch(self.gpu_switch, self.controller.settings["gpu_acceleration"])
         self._sync_switch(self.updates_switch, self.controller.settings["check_updates"])
@@ -354,24 +352,34 @@ class SettingsPage(ctk.CTkFrame):
         card.pack(fill="x", pady=2)
         card.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(card, text="", image=icon_image(icon_name, 20, "muted")).grid(
-            row=0, column=0, padx=(16, 14), pady=16
+            row=0, column=0, padx=(12, 12), pady=8
         )
         words = ctk.CTkFrame(card, fg_color="transparent")
-        words.grid(row=0, column=1, sticky="ew", pady=12)
-        title = self._add_label(words, title_key, font=ui_font(14), text_color=pair("text"), anchor="w")
+        words.grid(row=0, column=1, sticky="ew", pady=(8, 8))
+        title = self._add_label(
+            words, title_key, font=ui_font(13), text_color=pair("text"), anchor="w", height=18
+        )
         title.pack(anchor="w")
         if path_subtitle:
-            desc = ctk.CTkLabel(words, text="", font=ui_font(12), text_color=pair("muted"), anchor="w", justify="left")
-            desc.pack(anchor="w")
+            desc = ctk.CTkLabel(
+                words, text="", font=ui_font(12), text_color=pair("muted"), anchor="w", justify="left", height=16
+            )
+            desc.pack(anchor="w", pady=(1, 0))
         elif desc_key:
             desc = self._add_label(
-                words, desc_key, font=ui_font(12), text_color=pair("muted"), anchor="w", justify="left"
+                words,
+                desc_key,
+                font=ui_font(12),
+                text_color=pair("muted"),
+                anchor="w",
+                justify="left",
+                height=16,
             )
-            desc.pack(anchor="w")
+            desc.pack(anchor="w", pady=(1, 0))
         else:
             desc = None
         controls = ctk.CTkFrame(card, fg_color="transparent")
-        controls.grid(row=0, column=2, padx=(8, 16), pady=12, sticky="e")
+        controls.grid(row=0, column=2, padx=(8, 12), pady=8, sticky="e")
         return controls, title, desc
 
     def _value_row(self, parent, icon_name, title_key, desc_key, boxed: bool, command):
@@ -432,18 +440,43 @@ class SettingsPage(ctk.CTkFrame):
         return caption, switch
 
     def _switch(self, master, command) -> ctk.CTkSwitch:
-        return ctk.CTkSwitch(
+        switch = ctk.CTkSwitch(
             master,
             text="",
-            width=46,
-            switch_width=40,
-            switch_height=20,
+            width=52,
+            height=28,
+            switch_width=46,
+            switch_height=24,
+            border_width=2,
+            corner_radius=12,
+            border_color=("#6A6A6A", "#B0B0B0"),
+            fg_color=("#FFFFFF", "#1A1A1A"),
             progress_color=pair("accent"),
-            fg_color=pair("switch_off"),
-            button_color=("#FFFFFF", "#FFFFFF"),
-            button_hover_color=("#F7F7F7", "#F7F7F7"),
-            command=command,
+            button_color=("#1A1A1A", "#F2F2F2"),
+            button_hover_color=("#1A1A1A", "#F2F2F2"),
+            command=lambda: self._after_switch(switch, command),
         )
+        return switch
+
+    def _after_switch(self, switch: ctk.CTkSwitch, command) -> None:
+        self._paint_switch(switch, bool(switch.get()))
+        command()
+
+    def _paint_switch(self, switch: ctk.CTkSwitch, on: bool) -> None:
+        if on:
+            switch.configure(
+                button_color=("#FFFFFF", "#102030"),
+                border_width=0,
+                progress_color=pair("accent"),
+            )
+        else:
+            switch.configure(
+                button_color=("#1A1A1A", "#F2F2F2"),
+                border_width=2,
+                border_color=("#6A6A6A", "#B0B0B0"),
+                fg_color=("#FFFFFF", "#1A1A1A"),
+                progress_color=("#FFFFFF", "#1A1A1A"),
+            )
 
     def _button(self, master, key: str, command) -> ctk.CTkButton:
         button = ctk.CTkButton(
@@ -709,6 +742,7 @@ class SettingsPage(ctk.CTkFrame):
                 switch.select()
             else:
                 switch.deselect()
+        self._paint_switch(switch, on)
 
     def _open_license(self) -> None:
         path = license_path()
