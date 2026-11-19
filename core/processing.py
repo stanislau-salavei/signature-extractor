@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 
 try:
     import cv2
@@ -29,16 +29,25 @@ except ImportError:  # pragma: no cover - cv2 is a hard requirement of the app
     logging.getLogger(__name__).debug("module: ImportError caught", exc_info=True)   # remark 81
     cv2 = None
 
-try:
-    from pi_heif import register_heif_opener      # remark 99: decode-only build of pillow-heif (no x265 encoder)
-
-    register_heif_opener()
-    HAS_HEIF = True
-except Exception:  # pragma: no cover
-    logging.getLogger(__name__).debug("module: Exception caught", exc_info=True)   # remark 81
-    HAS_HEIF = False
-
 log = logging.getLogger(__name__)
+
+_HEIF: Optional[bool] = None
+
+
+def heif_available() -> bool:
+    """HEIC / HEIF opener of Pillow.  Remark 99: pi-heif, the decode-only build of pillow-heif (no x265 encoder);
+    remark 118 (audit C9): imported on the first HEIC, not at start-up."""
+    global _HEIF
+    if _HEIF is None:
+        try:
+            from pi_heif import register_heif_opener
+
+            register_heif_opener()
+            _HEIF = True
+        except Exception:  # pragma: no cover
+            log.debug("pi_heif: Exception caught", exc_info=True)   # remark 81
+            _HEIF = False
+    return _HEIF
 
 OPENCV_EXT = {".jpg", ".jpeg", ".jpe", ".png", ".bmp", ".dib", ".tif", ".tiff", ".webp"}
 HEIF_EXT = {".heic", ".heif"}
@@ -107,11 +116,26 @@ def scan_inputs(paths: Sequence[Path]) -> ScanResult:
     return res
 
 
+# EXIF orientation → the turn that shows the photo upright (the table of ImageOps.exif_transpose)
+ORIENTATION_TRANSPOSE = {2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180,
+                         4: Image.Transpose.FLIP_TOP_BOTTOM, 5: Image.Transpose.TRANSPOSE,
+                         6: Image.Transpose.ROTATE_270, 7: Image.Transpose.TRANSVERSE,
+                         8: Image.Transpose.ROTATE_90}
+
+
+def apply_orientation(img: Image.Image, orientation: int) -> Image.Image:
+    """Remark 118 (audit B13): one orientation function for the HEIF / clipboard and the OpenCV branches."""
+    transpose = ORIENTATION_TRANSPOSE.get(orientation)
+    return img.transpose(transpose) if transpose is not None else img
+
+
 def _normalize(img: Image.Image) -> Image.Image:
     try:
-        img = ImageOps.exif_transpose(img)
+        orientation = img.getexif().get(0x0112, 1)
     except Exception:  # broken EXIF must not stop loading
-        log.debug("exif_transpose failed", exc_info=True)
+        log.debug("exif orientation failed", exc_info=True)
+        orientation = 1
+    img = apply_orientation(img, orientation) if orientation in ORIENTATION_TRANSPOSE else img.copy()
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGBA" if "A" in img.getbands() or img.mode == "P" else "RGB")
     return img
@@ -145,6 +169,44 @@ def read_dpi(img: Image.Image) -> Optional[float]:
     return None
 
 
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+PNG_META_CHUNKS = {b"eXIf", b"tEXt", b"zTXt", b"iTXt"}     # EXIF and text (raw EXIF profile, XMP) chunks
+
+
+def png_meta_after_idat(path: Path) -> bool:
+    """Remark 101 (audit C3): does the PNG keep EXIF / text chunks after its image data?  Pillow reads those
+    only by decoding all the pixels (PngImageFile.getexif → load), so only then the slow way is needed.
+    Walks the chunk headers without reading the data; anything unusual → True (the old, slow way)."""
+    try:
+        with open(path, "rb") as f:
+            if f.read(8) != PNG_SIGNATURE:
+                return True
+            seen_idat = False
+            while True:
+                head = f.read(8)
+                if len(head) < 8:
+                    return True                       # truncated: let Pillow decide, as before
+                ctype = head[4:8]
+                if ctype == b"IEND":
+                    return False
+                if ctype == b"IDAT":
+                    seen_idat = True
+                elif seen_idat and ctype in PNG_META_CHUNKS:
+                    return True
+                f.seek(int.from_bytes(head[:4], "big") + 4, 1)   # chunk data + CRC
+    except OSError:
+        log.debug("png_meta_after_idat: OSError caught for %s", path, exc_info=True)   # remark 81
+        return True
+
+
+def _orientation(meta: Image.Image, path: Path) -> int:
+    """EXIF orientation (1 = as stored).  Remark 101: a PNG whose metadata all stands before the image data is
+    read from ``meta.info`` without decoding the pixels (OpenCV decodes them once afterwards)."""
+    if meta.format == "PNG" and not png_meta_after_idat(path):
+        return Image.Image.getexif(meta).get(0x0112, 1)
+    return meta.getexif().get(0x0112, 1)
+
+
 def load_image(path: Path) -> Tuple[Image.Image, Optional[float]]:
     """Load an approved format. Returns (RGB/RGBA image, DPI or None). Raises ImageLoadError."""
     path = Path(path)
@@ -153,7 +215,7 @@ def load_image(path: Path) -> Tuple[Image.Image, Optional[float]]:
         raise ImageLoadError(path.name)
     try:
         if suffix in HEIF_EXT:
-            if not HAS_HEIF:
+            if not heif_available():
                 raise ImageLoadError(path.name)
             pil = Image.open(path)
             pil.load()
@@ -164,7 +226,7 @@ def load_image(path: Path) -> Tuple[Image.Image, Optional[float]]:
         try:
             with Image.open(path) as meta:
                 dpi = read_dpi(meta)
-                orientation = meta.getexif().get(0x0112, 1)
+                orientation = _orientation(meta, path)
         except Exception:
             log.debug("metadata read failed for %s", path, exc_info=True)
         data = np.fromfile(str(path), dtype=np.uint8)
@@ -179,13 +241,7 @@ def load_image(path: Path) -> Tuple[Image.Image, Optional[float]]:
             img = Image.fromarray(cv2.cvtColor(arr, cv2.COLOR_BGRA2RGBA), "RGBA")
         else:
             img = Image.fromarray(cv2.cvtColor(arr[:, :, :3], cv2.COLOR_BGR2RGB), "RGB")
-        transpose = {2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180,
-                     4: Image.Transpose.FLIP_TOP_BOTTOM, 5: Image.Transpose.TRANSPOSE,
-                     6: Image.Transpose.ROTATE_270, 7: Image.Transpose.TRANSVERSE,
-                     8: Image.Transpose.ROTATE_90}.get(orientation)
-        if transpose is not None:
-            img = img.transpose(transpose)
-        return img, dpi
+        return apply_orientation(img, orientation), dpi
     except ImageLoadError:
         raise
     except Exception as exc:
@@ -195,6 +251,7 @@ def load_image(path: Path) -> Tuple[Image.Image, Optional[float]]:
 
 def load_image_bytes(data: bytes) -> Tuple[Image.Image, Optional[float]]:
     """Test hook (remark 106): used only by tests/test_remarks7.py; the clipboard is read with ImageGrab."""
+    heif_available()
     try:
         pil = Image.open(io.BytesIO(data))
         pil.load()

@@ -20,7 +20,7 @@ def test_r99_pi_heif_decoder_only():
 def test_r99_heic_sample_decodes(tmp_path):
     from core import processing as P
     from ui import smoke
-    assert P.HAS_HEIF
+    assert P.heif_available()
     p = tmp_path / "s.HEIC"
     p.write_bytes(base64.b64decode(smoke.SMOKE_HEIC))
     img, dpi = P.load_image(p)
@@ -169,3 +169,89 @@ def test_a13_repository_urls_in_one_place():
         if f.name != "version.py":
             t = f.read_text(encoding="utf-8")
             assert "stanislau-salavei/signature-extractor" not in t and "gpl-3.0.html" not in t, f
+
+
+# ================================================================== 101: PNG decoded once; B13: one orientation table
+def _png_with_exif_after_idat(path, orientation):
+    import io
+    import struct
+    import zlib
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (30, 20), (250, 250, 250)).save(buf, "PNG")
+    raw = buf.getvalue()
+    e = Image.Exif()
+    e[0x0112] = orientation
+    data = e.tobytes()
+    chunk = struct.pack(">I", len(data)) + b"eXIf" + data + struct.pack(">I", zlib.crc32(b"eXIf" + data) & 0xFFFFFFFF)
+    path.write_bytes(raw[:-12] + chunk + raw[-12:])          # IEND is the last 12 bytes
+
+
+def test_r101_png_orientation_without_pixel_decoding(tmp_path, monkeypatch):
+    from PIL import Image, PngImagePlugin
+    from core import processing as P
+    e = Image.Exif()
+    e[0x0112] = 6
+    before = tmp_path / "before.png"
+    Image.new("RGB", (30, 20), (250, 250, 250)).save(before, exif=e.tobytes())
+    after = tmp_path / "after.png"
+    _png_with_exif_after_idat(after, 6)
+    plain = tmp_path / "plain.png"
+    Image.new("RGB", (30, 20), (250, 250, 250)).save(plain)
+    assert not P.png_meta_after_idat(before) and not P.png_meta_after_idat(plain) and P.png_meta_after_idat(after)
+    loads = []
+    real = PngImagePlugin.PngImageFile.load
+    monkeypatch.setattr(PngImagePlugin.PngImageFile, "load", lambda self: loads.append(1) or real(self))
+    for p in (before, plain):
+        loads.clear()
+        img, _ = P.load_image(p)
+        assert not loads, p                                          # pixels decoded once (OpenCV)
+    assert P.load_image(before)[0].size == (20, 30) and P.load_image(plain)[0].size == (30, 20)
+    loads.clear()
+    assert P.load_image(after)[0].size == (20, 30) and loads         # rare file: the old, slow way
+    (tmp_path / "cut.png").write_bytes(plain.read_bytes()[:20])
+    assert P.png_meta_after_idat(tmp_path / "cut.png")
+
+
+def test_b13_one_orientation_table():
+    from PIL import Image, ImageOps
+    from core import processing as P
+    src = (ROOT / "core" / "processing.py").read_text(encoding="utf-8")
+    assert src.count("Image.Transpose.ROTATE_270") == 1 and "exif_transpose" not in src.replace("ImageOps.exif_transpose)", "")
+    im = Image.new("RGB", (5, 3))
+    im.putpixel((0, 0), (255, 0, 0))
+    for o in range(1, 9):
+        e = Image.Exif()
+        e[0x0112] = o
+        im.info["exif"] = e.tobytes()
+        im._exif = None
+        a = P._normalize(im)
+        b = ImageOps.exif_transpose(im)
+        assert a.size == b.size and a.tobytes() == b.tobytes(), o
+
+
+# ================================================================== 102: paper tint, C9: lazy imports
+def test_r102_paper_tint_samples_first():
+    import cv2
+    from core import tinted as T
+    rgb = np.full((300, 400, 3), (245, 232, 160), np.uint8)
+    rgb[100:140, 50:350] = (30, 40, 120)
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB)
+    core = np.zeros((300, 400), bool)
+    core[100:140, 50:350] = True
+    ua, ub, c = T.paper_tint(lab, core)
+    px = lab.reshape(-1, 3)[~core.ravel()][::7].astype(np.float32)      # the 1.0 formula
+    a, b = float(np.median(px[:, 1])) - 128.0, float(np.median(px[:, 2])) - 128.0
+    assert abs(c - float(np.hypot(a, b))) < 0.5 and c >= T.PAPER_TINT_C
+    assert "[::7][~core.ravel()[::7]]" in (ROOT / "core" / "tinted.py").read_text(encoding="utf-8")
+
+
+def test_c9_heif_and_updater_imported_lazily():
+    import subprocess
+    import sys
+    code = ("import sys; import core.processing as P; a = 'pi_heif' in sys.modules; P.heif_available(); "
+            "print(a, 'pi_heif' in sys.modules)")
+    out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True).stdout.split()
+    assert out == ["False", "True"]
+    from ui import app as A
+    assert isinstance(A.App.__dict__["updates"], property)

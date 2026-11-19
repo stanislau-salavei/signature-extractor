@@ -115,9 +115,8 @@ class App:
         ctk.ScalingTracker.add_widget(self._on_scaling, self.root)
         self.root.after(30, self._poll_worker)
         self.root.after(1500, self._poll_system_theme)
-        from ui.updates import UpdateController
-        self.updates = UpdateController(self)
-        self.root.after(3000, self.updates.startup)     # stage 5: silent check, once a day
+        self._updates = None
+        self.root.after(3000, lambda: self.updates.startup())     # stage 5: silent check, once a day
         self.root.deiconify()
         # CustomTkinter remembers a withdraw() made before the first mainloop() and, on Windows,
         # hides the window again when mainloop() starts (it applies the title-bar colour and then
@@ -495,6 +494,15 @@ class App:
                       lang=self.i18n.lang).replace("\\n", "\n")
         url = f"{REPO_URL}/issues/new?" + urllib.parse.urlencode({"body": body})
         return url[:2000]
+
+    @property
+    def updates(self):
+        """Remark 118 (audit C9): core.updater (urllib, ssl) is imported when the check starts (3 s after the
+        start or «Проверить сейчас»), not while the window opens."""
+        if self._updates is None:
+            from ui.updates import UpdateController
+            self._updates = UpdateController(self)
+        return self._updates
 
     def check_for_updates(self, manual: bool = True):
         self.updates.check(manual=manual)

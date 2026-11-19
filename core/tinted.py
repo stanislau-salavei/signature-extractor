@@ -55,7 +55,9 @@ def white_balance(rgb: np.ndarray) -> np.ndarray:
 
 
 def paper_tint(lab: np.ndarray, core: np.ndarray):
-    px = lab.reshape(-1, 3)[~core.ravel()][::7].astype(np.float32)
+    # remark 102 (audit C4): every 7th pixel first, then the mask (no copy of the whole frame); the sample is
+    # another 1/7 of the paper, so the median may differ in the last digits
+    px = lab.reshape(-1, 3)[::7][~core.ravel()[::7]].astype(np.float32)
     if px.shape[0] < 100:
         return None
     a, b = float(np.median(px[:, 1])) - 128.0, float(np.median(px[:, 2])) - 128.0
