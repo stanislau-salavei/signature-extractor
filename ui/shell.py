@@ -75,17 +75,17 @@ class Stepper(Control):
             # number circle 20, ring 1.5 (spec) ; text baseline box 6..26
             if on:
                 self.put_cached(cx, cy, ("stepc", "on", Theme.c("accent"), Theme.c(cbg)),
-                                lambda: gfx.circle(20, Theme.c("accent"), bg=Theme.c(cbg)))
+                                lambda cbg=cbg: gfx.circle(20, Theme.c("accent"), bg=Theme.c(cbg)))
                 self.text(cx + 10, cy + 10, str(i + 1), 11, "semibold", "on_accent", anchor="center")
                 tcol = "text"
             elif i in self.done:
                 self.put_cached(cx, cy, ("stepc", "done", Theme.c("accent"), Theme.c(cbg)),
-                                lambda: gfx.circle(20, Theme.c(cbg), Theme.c("accent"), 1.5, bg=Theme.c(cbg)))
+                                lambda cbg=cbg: gfx.circle(20, Theme.c(cbg), Theme.c("accent"), 1.5, bg=Theme.c(cbg)))
                 self.icon("step_check", cx + 4, cy + 4, 12, "accent")
                 tcol = "text"
             else:
                 self.put_cached(cx, cy, ("stepc", "off", Theme.c("step_ring"), Theme.c(cbg)),
-                                lambda: gfx.circle(20, Theme.c(cbg), Theme.c("step_ring"), 1.5, bg=Theme.c(cbg)))
+                                lambda cbg=cbg: gfx.circle(20, Theme.c(cbg), Theme.c("step_ring"), 1.5, bg=Theme.c(cbg)))
                 self.text(cx + 10, cy + 10, str(i + 1), 11, "semibold", "muted", anchor="center")
                 tcol = "muted"
             self.text(cx + 20 + 8, cy + 10, self.labels[i], 13, color=tcol)

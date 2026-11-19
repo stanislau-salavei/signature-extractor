@@ -1305,7 +1305,7 @@ class ExportPage(Box):
                 log.error("cannot write %s: %s", base, exc)
                 rest = pairs[k:]
                 self.bar.redraw()
-                self._save_error(lambda: self._write_pairs(job, rest, outputs))   # retry from the failed file
+                self._save_error(lambda rest=rest: self._write_pairs(job, rest, outputs))   # retry from the failed file
                 return
         self.bar.redraw()
         self.after(1, self._save_next)

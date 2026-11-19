@@ -487,7 +487,7 @@ def resolve_bridges(nodes, paths, width_px: float):
                     break
                 continue
 
-            def straight(ia, ib):   # arriving direction of branch ia vs leaving direction of ib
+            def straight(ia, ib, da=da, db=db):   # arriving direction of branch ia vs leaving direction of ib
                 return -(da[ia][0] * db[ib][0] + da[ia][1] * db[ib][1])
             pairs = [(0, 0), (1, 1)] if straight(0, 0) + straight(1, 1) >= straight(0, 1) + straight(1, 0) \
                 else [(0, 1), (1, 0)]

@@ -108,11 +108,11 @@ def draw_bar(box, g, t: float, under: str, put) -> None:
                 ax, ay, aw, ah = g[name]
                 if horizontal:      # the 8 × 6 arrow turned on its side (6 × 8), pointing left / right
                     put(ax, ay, ("sb_arrow", name, col, track),
-                        lambda name=name: gfx.triangle(ah, aw, col, track, True).rotate(
+                        lambda name=name, aw=aw, ah=ah: gfx.triangle(ah, aw, col, track, True).rotate(
                             90 if name == "left" else -90, expand=True))
                 else:
                     put(ax, ay, ("sb_arrow", name, col, track),
-                        lambda name=name: gfx.triangle(aw, ah, col, track, name == "up"))
+                        lambda name=name, aw=aw, ah=ah: gfx.triangle(aw, ah, col, track, name == "up"))
         under = track
     x, y, w, h = g["thumb"]
     thumb = Theme.c("scroll_thumb")
