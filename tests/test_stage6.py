@@ -52,9 +52,9 @@ def build_mod():
 # ================================================================== version (one place)
 def test_version_one_place():
     from core import version as V
-    assert V.VERSION == "1.0" and V.RELEASE_TAG == "v1.0"
+    assert V.VERSION == "1.0.1" and V.RELEASE_TAG == "v1.0.1"
     b = build_mod()
-    assert b.read_version() == "1.0"
+    assert b.read_version() == "1.0.1"
     for p in ("ui/app.py", "ui/pages/settings_page.py"):
         src = (ROOT / p).read_text(encoding="utf-8")
         assert "from core.version import" in src
@@ -386,5 +386,5 @@ def test_ui_smoke_report(tmp_path, env_restore, monkeypatch):
             break
         time.sleep(0.01)
     data = json.loads(rep.read_text(encoding="utf-8"))
-    assert data["ok"] and data["version"] == "1.0" and data["heic"] == [64, 48] and data["frozen"] is False
+    assert data["ok"] and data["version"] == "1.0.1" and data["heic"] == [64, 48] and data["frozen"] is False
     assert _saved(tmp_path) is None                    # the smoke run does not remember a window size
