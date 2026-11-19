@@ -181,6 +181,10 @@ class Popup:
         self._imgs.append(p)
         return self.cv.create_image(S(self.px + x), S(self.py + y), image=p, anchor=anchor, tags=tags)
 
+    def put_cached(self, x, y, key, factory, tags=(), anchor="nw"):
+        """Remark 118 (audit B11): a static image from the gfx cache (no new PhotoImage per redraw)."""
+        return self.put(x, y, gfx.photo(key, factory), tags=tags, anchor=anchor)
+
     def text(self, x, cy, s, px=14, color="text", tags=(), anchor="w", weight="normal"):
         return self.cv.create_text(S(self.px + x), S(self.py + cy), text=s, font=F(px, weight),
                                    fill=Theme.c(color), anchor=anchor, tags=tags)
@@ -235,13 +239,16 @@ class MenuPopup(Popup):
                                          S(self.py + top + 3), fill=Theme.c("menu_sep"), width=0, tags="items")
                 continue
             if i == self.hover_i and not it.disabled:
-                self.put(5, top, gfx.rrect(self.pw - 10, 36, 4, Theme.c("menu_hover"), bg=Theme.c("menu")),
-                         tags="items")
+                hov, mbg = Theme.c("menu_hover"), Theme.c("menu")
+                self.put_cached(5, top, ("rr", self.pw - 10, 36, 4, hov, None, mbg, ()),
+                                lambda hov=hov, mbg=mbg: gfx.rrect(self.pw - 10, 36, 4, hov, bg=mbg), tags="items")
             color = "disabled" if it.disabled else "text"
             tx = 5 + 9
             if self.has_icons:
                 if it.icon:
-                    self.put(tx, top + 10, gfx.icon(it.icon, 16, Theme.c(color)), tags="items")
+                    ic, icc = it.icon, Theme.c(color)
+                    self.put_cached(tx, top + 10, ("ic", ic, 16, icc), lambda ic=ic, icc=icc: gfx.icon(ic, 16, icc),
+                                    tags="items")
                 tx += 16 + 12
             else:
                 tx += 3
@@ -359,20 +366,26 @@ class ListPopup(Popup):
             if vis_bot <= vis_top:
                 continue
             if i == self.selected or i == self.hover_i:
-                im = gfx.rrect(self.pw - 10, self.ITEM_H, 4, Theme.c("menu_sel"), bg=menu)
-                if vis_top > t or vis_bot < t + self.ITEM_H:
-                    im = im.crop((0, S(vis_top - t), im.width, S(vis_bot - t)))
-                self.put(5, vis_top, im, tags="items")
+                sel, c0, c1 = Theme.c("menu_sel"), S(vis_top - t), S(vis_bot - t)
+
+                def sel_img(sel=sel, menu=menu, c0=c0, c1=c1, cut=vis_top > t or vis_bot < t + self.ITEM_H):
+                    im = gfx.rrect(self.pw - 10, self.ITEM_H, 4, sel, bg=menu)
+                    return im.crop((0, c0, im.width, c1)) if cut else im
+                self.put_cached(5, vis_top, ("lsel", self.pw - 10, self.ITEM_H, sel, menu, c0, c1,
+                                             vis_top > t or vis_bot < t + self.ITEM_H), sel_img, tags="items")
             if i == self.selected and 1 < t + 10 and t + 26 < self.ph - 1:
-                self.put(5, t + 10, gfx.rrect(3, 16, 1.5, Theme.c("accent"), bg=Theme.c("menu_sel")), tags="items")
+                acc, sel = Theme.c("accent"), Theme.c("menu_sel")
+                self.put_cached(5, t + 10, ("rr", 3, 16, 1.5, acc, None, sel, ()),
+                                lambda acc=acc, sel=sel: gfx.rrect(3, 16, 1.5, acc, bg=sel), tags="items")
             cy = t + self.ITEM_H / 2
             if 4 < cy < self.ph - 4:
                 tx = 5 + 12
                 sw = self.swatches.get(i)
                 if sw:
-                    self.put(tx, cy - 8, gfx.rrect(16, 16, 4, sw, Theme.c("swatch_stroke"),
-                                                   bg=Theme.c("menu_sel") if i in (self.selected, self.hover_i) else menu),
-                             tags="items")
+                    sst = Theme.c("swatch_stroke")
+                    sbg = Theme.c("menu_sel") if i in (self.selected, self.hover_i) else menu
+                    self.put_cached(tx, cy - 8, ("rr", 16, 16, 4, sw, sst, sbg, ()),
+                                    lambda sw=sw, sst=sst, sbg=sbg: gfx.rrect(16, 16, 4, sw, sst, bg=sbg), tags="items")
                     tx += 24
                 self.text(tx, cy, elide(self.labels[i], self.text_room(i), 14), 14, "text", tags="items")
         # cover overflow under the rounded border (redraw the border band)
@@ -396,7 +409,7 @@ class ListPopup(Popup):
         from ui.widgets.scroll import draw_bar
         g = self._sb_geo()
         if g:
-            draw_bar(self.cv, g, self.sb.t, Theme.c("menu"), lambda x, y, key, f: self.put(x, y, f(), tags="items"))
+            draw_bar(self.cv, g, self.sb.t, Theme.c("menu"), lambda x, y, key, f: self.put_cached(x, y, key, f, tags="items"))
 
     def _sb_step(self, d, first=False):
         if self.closed:

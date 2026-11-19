@@ -396,3 +396,11 @@ def test_b9_zip_strict():
     r = subprocess.run([ruff, "check", "--select", "B905", "--output-format", "concise", "core", "ui"], cwd=ROOT,
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+def test_b11_static_popup_images_cached():
+    from ui.widgets.overlay import Popup
+    assert hasattr(Popup, "put_cached")
+    for f in ("ui/widgets/overlay.py", "ui/dialogs/color_dialog.py"):
+        src = (ROOT / f).read_text(encoding="utf-8")
+        assert not re.search(r"self\.put\([^\n]*gfx\.", src), f

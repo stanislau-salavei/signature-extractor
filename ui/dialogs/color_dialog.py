@@ -29,6 +29,18 @@ PAPER = {"light": "#EFECE3", "dark": "#3A3830"}
 CHECK = {"light": ("#FFFFFF", "#E6E8EC"), "dark": ("#2A2A2A", "#1C1C1C")}
 
 
+
+def _hue_bar() -> Image.Image:
+    """Hue bar 378 × 12, radius 4, on the dialog colour (static: cached)."""
+    hw = S(378)
+    hs = np.linspace(0, 1, hw)
+    row = (np.array([colorsys.hsv_to_rgb(h, 1, 1) for h in hs]) * 255).astype(np.uint8)
+    hue = Image.fromarray(np.repeat(row[None], S(12), axis=0), "RGB").convert("RGBA")
+    hm = gfx.rrect(378, 12, 4, "#FFFFFF").getchannel("A").resize(hue.size)
+    hb = Image.new("RGBA", hue.size, gfx.rgba(Theme.c("dialog")))
+    hb.paste(hue, (0, 0), hm)
+    return hb
+
 class _Board(Box):
     def __init__(self, master, dlg):
         super().__init__(master, bg="dialog")
@@ -75,16 +87,9 @@ class _Board(Box):
         img.alpha_composite(gfx.rrect(200, 200, 4, None, Theme.c("card_stroke")).resize(sv.size))
         self.put(20, 18, img)
         cx, cy = 20 + d.s * 200, 18 + (1 - d.v) * 200
-        self.put(cx - 7, cy - 7, gfx.circle(14, None, "#FFFFFF", 2))
+        self.put_cached(cx - 7, cy - 7, ("cd_ring", 14), lambda: gfx.circle(14, None, "#FFFFFF", 2))
         # hue bar 378×12 r4 at y 257, thumb 20
-        hw = S(378)
-        hs = np.linspace(0, 1, hw)
-        row = (np.array([colorsys.hsv_to_rgb(h, 1, 1) for h in hs]) * 255).astype(np.uint8)
-        hue = Image.fromarray(np.repeat(row[None], S(12), axis=0), "RGB").convert("RGBA")
-        hm = gfx.rrect(378, 12, 4, "#FFFFFF").getchannel("A").resize(hue.size)
-        hb = Image.new("RGBA", hue.size, gfx.rgba(Theme.c("dialog")))
-        hb.paste(hue, (0, 0), hm)
-        self.put(20, 257, hb)
+        self.put_cached(20, 257, ("cd_hue_bar", Theme.c("dialog")), _hue_bar)     # remark 118 (audit B11)
         hx = 20 + min(max(d.h * 378, 10), 368)
         pure = ex.rgb_to_hex(tuple(int(c * 255) for c in colorsys.hsv_to_rgb(d.h, 1, 1)))
         self.put(hx - 10, 263 - 10, gfx.circle(20, pure, "#FFFFFF", 3))
