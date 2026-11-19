@@ -153,9 +153,11 @@ def test_a8_a9_a10_ruff_clean():
     r = subprocess.run([ruff, "check", "--no-cache", "--select", "F401,F841,B023,SIM222,RUF034", "core", "ui"],
                        cwd=ROOT, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
-    for f in ("core/tinted.py", "ui/pages/export_page.py"):
+    files = ["core/tinted.py", "ui/pages/export_page.py"] + [f"ui/pages/export/{n}" for n in ("cards.py", "preview_box.py",
+                                                                                         "save_flow.py")]
+    for f in files:
         assert "if True:" not in (ROOT / f).read_text(encoding="utf-8"), f
-    assert "if False else" not in (ROOT / "ui/pages/export_page.py").read_text(encoding="utf-8")
+        assert "if False else" not in (ROOT / f).read_text(encoding="utf-8"), f
 
 
 def test_a13_repository_urls_in_one_place():
@@ -374,7 +376,8 @@ def test_r113_named_layout_and_thresholds():
     assert (I.DROP_TILE, I.DROP_CONTENT_H, I.BUSY_CONTENT_H) == (84, 191, 112)
     assert (P.COLOR_CHROMA, P.INK_CHROMA_MIN, P.MIN_INK_PX, P.INK_SAMPLE_PX) == (14.0, 10.0, 60, 40000)
     assert (T.SMALL_SIDE_PX, T.PAPER_MIN_PX, T.INNER_MIN_PX) == (400, 100, 200)
-    for f in ("ui/app.py", "ui/pages/export_page.py", "ui/pages/process_page.py", "ui/pages/import_page.py"):
+    for f in ("ui/app.py", "ui/pages/export_page.py", "ui/pages/process_page.py", "ui/pages/import_page.py",
+              "ui/pages/export/save_flow.py", "ui/pages/export/cards.py"):
         src = (ROOT / f).read_text(encoding="utf-8")
         assert "geom(0, 64," not in src and "h - 64" not in src and "lh - 64" not in src, f
 
@@ -405,3 +408,74 @@ def test_b11_static_popup_images_cached():
     assert not re.search(r"self\.put\([^\n]*gfx\.(rrect|icon|circle)\(", src)
     src = (ROOT / "ui" / "dialogs" / "color_dialog.py").read_text(encoding="utf-8")
     assert '("cd_ring", 14)' in src and '("cd_hue_bar", Theme.c("dialog")), _hue_bar' in src   # the hue thumb changes
+
+
+# ================================================================== 100: smaller functions
+def test_r100_process_stages_and_settings_schema():
+    from core import processing as P
+    from core import settings as St
+    for name in ("_ink_stage", "_mask_stage", "_frame_stage", "_assemble_result"):
+        assert callable(getattr(P, name))
+    assert set(St.SETTINGS_SCHEMA) <= set(St.DEFAULT_SETTINGS)
+    ok = [("theme", "dark"), ("png_resolution", 600), ("crop_margin_mm", 0.5), ("default_formats", ["PNG"]),
+          ("save_folder", None), ("settings_version", 3), ("dxf_line_mm", 0.18)]
+    bad = [("theme", "blue"), ("png_resolution", True), ("crop_margin_mm", 101), ("default_formats", ["GIF"]),
+           ("save_folder", 5), ("settings_version", True), ("dxf_line_mm", 0.001), ("svg_mode", "thick")]
+    assert all(St._valid(k, v) for k, v in ok) and not any(St._valid(k, v) for k, v in bad)
+    from ui.pages.export_page import _PreviewBox
+    for name in ("_draw_png", "_draw_vector", "_draw_badge"):
+        assert callable(getattr(_PreviewBox, name))
+
+
+# ================================================================== 117, 103a, C8, B10: export preview model
+@pytest.fixture(scope="module")
+def ex_source():
+    from core import export as ex
+    m = np.zeros((300, 700), dtype=bool)
+    m[100:110, 80:600] = True
+    m[60:240, 300:312] = True
+    return ex.source_from_mask(m, 300, (20, 30, 120), "IMG_1")
+
+
+def test_r103_traces_only_what_formats_need(ex_source, monkeypatch):
+    from core import export as ex
+    from core import export_preview as EP
+    assert EP.needed_traces(("PNG",), "original") == (False, False)
+    assert EP.needed_traces(("SVG",), "original") == (True, False)
+    assert EP.needed_traces(("SVG",), "stroke") == (False, True)
+    assert EP.needed_traces(("PNG", "DXF"), "original") == (False, True)
+    assert EP.needed_traces(("SVG", "DXF"), "original") == (True, True)
+    calls = []
+    real_o, real_c = ex.trace_outline, ex.trace_centerline
+    monkeypatch.setattr(ex, "trace_outline", lambda *a: calls.append("o") or real_o(*a))
+    monkeypatch.setattr(ex, "trace_centerline", lambda *a: calls.append("c") or real_c(*a))
+    geom = ex.compute_geometry(*ex_source.size_px, ex_source.dpi, ex.SizeChoice.box(40, 15), 1.0)
+    m = EP.ExportPreviewModel()
+    gk = EP.geom_key(ex_source, geom)
+    m.set_trace(m.trace_job(ex_source, geom, ("SVG",), "original", [("SVG", (0, 0, 0), 0.18, "original", 0.18)])())
+    assert calls == ["o"] and m.trace_ready(gk, ("SVG",), "original") and not m.trace_ready(gk, ("DXF",), "original")
+    assert m.vector_kb("SVG", (0, 0, 0), 0.18, "original", 0.18) == \
+        ex.vector_sizes_kb(m.outline, None, (0, 0, 0))["SVG"]                       # C8: made in the job
+    assert calls == ["o"]
+    m.set_trace(m.trace_job(ex_source, geom, ("SVG", "DXF"), "original")())       # only the missing one
+    assert calls == ["o", "c"] and m.trace_ready(gk, ("SVG", "DXF"), "stroke")
+    assert m.vector_kb("DXF", (0, 0, 0), 0.18, "original", 0.18) == \
+        ex.vector_sizes_kb(None, m.centerline, (0, 0, 0), 0.18)["DXF"]
+
+
+def test_b10_preview_png_reused_only_for_same_file(ex_source):
+    from core import export as ex
+    from core import export_preview as EP
+    size = ex.SizeChoice.box(40, 15)
+    geom = ex.compute_geometry(*ex_source.size_px, ex_source.dpi, size, 1.0)
+    m = EP.ExportPreviewModel()
+    dpi = ex.effective_png_dpi(ex_source, size, 600)
+    m.set_png(m.png_job(ex_source, geom, (20, 30, 120), dpi)())
+    data = m.png_bytes_for(ex_source, geom, (20, 30, 120), dpi)
+    job = ex.ExportJob(ex_source, size, 1.0, (20, 30, 120), 600, ("PNG",))
+    assert data is not None and data == ex.build_outputs(job)["PNG"]
+    assert ex.build_outputs(job, png=data)["PNG"] is data
+    assert m.png_bytes_for(ex_source, geom, (20, 30, 121), dpi) is None
+    assert m.png_bytes_for(ex_source, geom, (20, 30, 120), 300) is None
+    g2 = ex.compute_geometry(*ex_source.size_px, ex_source.dpi, size, 2.0)
+    assert m.png_bytes_for(ex_source, g2, (20, 30, 120), dpi) is None

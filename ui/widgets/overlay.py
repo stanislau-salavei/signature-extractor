@@ -196,7 +196,6 @@ class MenuItem:
         self.text, self.command, self.icon, self.disabled = text, command, icon, disabled
 
 
-
 class MenuPopup(Popup):
     """Task-Manager-like menu: radius 8, items 36 / step 38, icons 16, gap 12, text 14."""
 

@@ -5,7 +5,6 @@ import logging
 import os
 import subprocess
 import sys
-import tkinter as tk
 import webbrowser
 from dataclasses import replace
 from pathlib import Path
@@ -23,6 +22,9 @@ from ui import gfx, platform_win
 from ui.theme import HEADER_H, Fonts, Scale, Theme
 from ui.widgets.base import Registry, Tooltip
 from ui.widgets.overlay import MenuItem, MenuPopup, Popup, TooltipLayer, widget_rect
+from ui.keys import KeysMixin
+from ui.open_flow import OpenFlowMixin
+from ui.report import ReportMixin
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +57,6 @@ except Exception:  # pragma: no cover
 
 # Job / EditState live in core.batch since stage 4 (one class for a single photo and a batch item)
 from core.batch import LOADED_MAX, Batch, EditState, Job  # noqa: E402  (re-exported for tests)
-from core import batch as B  # noqa: E402
 
 
 def _state(name: str, doc: str = ""):
@@ -63,7 +64,7 @@ def _state(name: str, doc: str = ""):
     return property(lambda self: getattr(self.state, name), lambda self, v: setattr(self.state, name, v), doc=doc)
 
 
-class App:
+class App(KeysMixin, OpenFlowMixin, ReportMixin):
     VERSION_STR = VERSION
     job = _state("job", "current photo")
     batch = _state("batch", "stage 4: folder / several files")
@@ -486,19 +487,6 @@ class App:
         from ui.dialogs.about import AboutDialog
         AboutDialog(self)
 
-    def report_issue(self):
-        """«Сообщить о проблеме» (stage 5): a new GitHub issue with the app version, Windows and the language
-        already filled in (English body, no title — user decision; remark 88: no graphics card / DirectX 12)."""
-        self.open_url(self.issue_url())
-
-    def issue_url(self) -> str:
-        import urllib.parse
-        from ui import platform_win as pw
-        body = self.t("issue.body", version=self.VERSION_STR, windows=pw.windows_version(),
-                      lang=self.i18n.lang).replace("\\n", "\n")
-        url = f"{REPO_URL}/issues/new?" + urllib.parse.urlencode({"body": body})
-        return url[:2000]
-
     @property
     def updates(self):
         """Remark 118 (audit C9): core.updater (urllib, ssl) is imported when the check starts (3 s after the
@@ -535,77 +523,6 @@ class App:
                 subprocess.Popen(["xdg-open", str(path)])
         except Exception:
             log.exception("cannot open folder %s", path)
-
-    # ------------------------------------------------------------------ keys
-    def _bind_keys(self):
-        r = self.root
-        # remark 80: one handler for every Ctrl+letter, by the physical key (any keyboard layout, ui/keys.py)
-        r.bind_all("<Control-KeyPress>", self._ctrl_key, add="+")
-        r.bind_all("<Escape>", self._esc, add="+")
-        # stage 4: ← / → switch photos of the batch (screens 2 and 3)
-        r.bind_all("<Left>", lambda e: self._arrow_key(-1), add="+")
-        r.bind_all("<Right>", lambda e: self._arrow_key(1), add="+")
-
-    def _arrow_key(self, d):
-        if self.batch is None or self.saving or self.overlay_open() or self.page not in ("process", "export"):
-            return None
-        if isinstance(self.root.focus_get(), tk.Entry) or Popup.current is not None:
-            return None
-        self.step_photo(d)
-        return "break"
-
-    def _ctrl_key(self, e):
-        """Ctrl+O open, Ctrl+S export, Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo, Ctrl+V paste — whatever the
-        layout.  In a text field with a non-Latin layout the field's own Ctrl+A/C/V/X/Z/Y are sent as Tk
-        virtual events (with a Latin layout Tk's class bindings already did it)."""
-        from ui import keys as K
-        try:
-            ws = self.root.tk.call("tk", "windowingsystem")
-        except tk.TclError:
-            log.debug("windowingsystem unknown", exc_info=True)
-            ws = ""
-        letter = K.latin_letter(str(e.keysym), int(e.keycode or 0), ws)
-        if letter is None:
-            return None
-        shift = bool(int(e.state or 0) & K.SHIFT)
-        focus = self.root.focus_get()
-        if isinstance(focus, tk.Entry) and not K.is_latin_keysym(str(e.keysym)) and letter in K.ENTRY_EVENTS:
-            focus.event_generate(K.ENTRY_EVENTS[letter])
-            return "break"
-        if letter == "o":
-            return self._key(self.open_file_dialog)
-        if letter == "s":
-            return self._key(self.go_export)
-        if letter == "z":
-            return self._key(self.redo if shift else self.undo, text_ok=False)
-        if letter == "y":
-            return self._key(self.redo, text_ok=False)
-        if letter == "v":
-            return self._key(self.paste_clipboard, text_ok=False)
-        return None
-
-    def _key(self, fn, text_ok=True):
-        if self.saving:
-            return "break"
-        focus = self.root.focus_get()
-        if not text_ok and isinstance(focus, tk.Entry):
-            return None  # let the text field handle its own undo / paste
-        if Popup.current is not None and not isinstance(Popup.current, MenuPopup):
-            return "break"
-        fn()
-        return "break"
-
-    def _esc(self, e=None):
-        if Popup.current is not None:
-            getattr(Popup.current, "escape", Popup.current.close)()
-            return "break"
-        if self.settings_open:
-            self.close_settings()
-            return "break"
-        if self.help_open:
-            self.close_help()
-            return "break"
-        return None
 
     # ------------------------------------------------------------------ drag and drop
     def _setup_dnd(self):
@@ -645,50 +562,6 @@ class App:
         if self.page == "import":
             self.import_page.drop.set_mode("over" if on else "idle")
 
-    # ------------------------------------------------------------------ opening files
-    def open_file_dialog(self):
-        def go():
-            exts = " ".join("*" + e for e in sorted(P.SUPPORTED_EXT))
-            # stage 4: several files chosen → a batch; one file → the single-photo flow
-            names = filedialog.askopenfilenames(parent=self.root, title=self.t("menu.open_file"),
-                                                filetypes=[(self.t("menu.open_file"), exts)])
-            if isinstance(names, str):
-                names = self.root.tk.splitlist(names)
-            if names:
-                self.open_paths([Path(n) for n in names])
-        self.confirm_restart(go)
-
-    def open_folder_dialog(self):
-        def go():
-            path = filedialog.askdirectory(parent=self.root, title=self.t("menu.add_folder"))
-            if path:
-                self.open_paths([Path(path)])
-        self.confirm_restart(go)
-
-    def paste_clipboard(self):
-        if self.overlay_open():
-            return
-        try:
-            from PIL import ImageGrab
-            data = ImageGrab.grabclipboard()
-        except Exception:
-            log.debug("clipboard read failed", exc_info=True)
-            data = None
-        if isinstance(data, list):
-            paths = [Path(p) for p in data if isinstance(p, str)]
-            if paths:
-                self.confirm_restart(lambda: self.open_paths(paths))
-            return
-        if data is None or not hasattr(data, "size"):
-            # no image on the clipboard: clear error (errors.clipboard.*)
-            self.show_error_dialog(self.t("errors.clipboard.title"), self.t("errors.clipboard.body"))
-            return
-        img = data
-
-        def go():
-            self.start_processing(lambda: (P._normalize(img), P.read_dpi(img), "clipboard.png"))
-        self.confirm_restart(go)
-
     # remark 39: «Начать заново?» when the work is not saved OR anything changed after the last successful
     # save — edits, Ctrl+Z/Y, «Убрать»/«Добавить», «Применить настройки ко всем», export settings, a cancelled
     # or failed save.  A snapshot of (photo id, version) per photo + the export settings is taken on a
@@ -719,74 +592,7 @@ class App:
         else:
             then()
 
-    def open_paths(self, paths: List[Path]):
-        """Open dropped / chosen paths.  A folder or several files make a batch (stage 4), even if only
-        one photo is found; one file is the single-photo flow of stage 3."""
-        if self.settings_open:
-            self.close_settings()
-        if self.help_open:
-            self.close_help()
-        paths = [Path(p) for p in paths]
-        is_batch = len(paths) > 1 or any(p.is_dir() for p in paths)
-        scan = P.scan_inputs(paths)
-        self.import_page.clear_error()
-        if not scan.photos:
-            if scan.too_large:
-                f = scan.too_large[0]
-                self.go_home(keep_error=True)
-                self.import_page.show_error(self.t("import.too_large", file=f.name,
-                                                   size=self.fmt_num(P.file_size_mb(f), 0)))
-                return
-            if scan.skipped_other:
-                f = scan.skipped_other[0]
-                self.show_error_dialog(self.t("errors.open.title"), self.t("errors.open.body", file=f.name))
-            return
-        if is_batch:
-            batch = Batch(scan.photos, scan.too_large, params=P.ProcessParams())
-            go = lambda: self.start_batch(batch)   # noqa: E731
-        else:
-            photo_path = scan.photos[0]
-
-            def load():
-                img, dpi = P.load_image(photo_path)
-                return img, dpi, photo_path.name
-            go = lambda: self.start_processing(load)   # noqa: E731
-        if scan.skipped_other:
-            # 04: shown over screen 1 before processing; «Понятно» continues with the photos
-            from ui.dialogs.content import ContentDialog
-            self.go_home()
-            ContentDialog(self, self.t("import.skipped_title"),
-                          self.tn("import.skipped_body", len(scan.skipped_other), photos=len(scan.photos)),
-                          [(self.t("common.got_it"), "primary", go)], width=440, esc_index=0)
-            return
-        go()
-
-    def start_processing(self, loader):
-        self.reset_batch()
-        params = P.ProcessParams()
-        self._pending_params = params
-        self.job = None
-        self.show_page("busy")
-
-        def work():
-            img, dpi, name = loader()
-            photo = P.prepare_photo(img, dpi, name)
-            res = P.process(photo, params)
-            return photo, res
-
-        self.worker.submit("process", work, self._loaded, self._load_failed)
-
-    def _loaded(self, value):
-        photo, res = value
-        self.job = Job(photo, self._pending_params)
-        self.job.apply_result(photo, res, self.job.version)
-        self.show_page("process")
         # remark 74: «no signature» is the yellow card under the image (process_page.layout), not dialog 30
-
-    def _load_failed(self, exc):
-        self.go_home()
-        name = exc.args[0] if isinstance(exc, P.ImageLoadError) and exc.args else "?"
-        self.show_error_dialog(self.t("errors.open.title"), self.t("errors.open.body", file=name), width=460)
 
     def show_error_dialog(self, title, body, width=420, retry=None, on_cancel=None):
         from ui.dialogs.content import ContentDialog
@@ -826,75 +632,6 @@ class App:
         first = b.items[0]
         b.index = 0
         self.process_job(first, on_first=True)
-
-    def process_job(self, job: Job, background: bool = False, on_first: bool = False):
-        """Run the pipeline for ``job``'s current state on the worker (latest request per photo wins)."""
-        state, version, photo = job.state, job.version, job.photo
-
-        def work():
-            return B.process_job(job, state, photo)
-
-        def done(res):
-            self._job_done(job, version, res, on_first)
-
-        def fail(exc):
-            self._job_failed(job, exc, on_first)
-        self.worker.submit(f"job:{job.id}", work, done, fail, priority=10 if background else 0)
-
-    def _job_done(self, job: Job, version: int, res, on_first=False):
-        photo, result, thumb = res
-        b = self.batch
-        if b is not None and b.index_of(job) < 0 and job is not self.job:
-            return   # removed meanwhile
-        if job.version != version:
-            if job.photo is None and (job is self.job):
-                job.photo = photo      # keep the loaded photo for the newer request
-            return
-        job.apply_result(photo, result, version, thumb)
-        if b is None:
-            if job is self.job and self.process_page:
-                self.process_page.on_result()
-            self.update_header()
-            return
-        if on_first:
-            self.job = job
-            self._touch(job)
-            self.show_page("process")
-            for other in b.items[1:]:
-                if other.busy:
-                    self.process_job(other, background=True)
-        elif job is not self.job and not self.state.is_recent(job):
-            job.unload()               # background result: keep only the summary
-        b.note_attention()
-        if job is self.job:
-            self.on_batch_changed(result_for_current=True)
-        else:
-            self.on_batch_changed(coalesce=True)
-
-    def _job_failed(self, job: Job, exc, on_first=False):
-        b = self.batch
-        if b is None:
-            log.error("processing failed: %s", exc)
-            return
-        if not isinstance(exc, (P.ImageLoadError, OSError, ValueError)):
-            log.error("processing failed for %s: %s", job.name, exc)
-        # a damaged file inside a batch leaves the batch; dialog 29 names the first one
-        was_current = job is self.job
-        nxt = b.remove(job)
-        if not self._load_error_shown and Popup.current is None:
-            self._load_error_shown = True
-            self.root.after(1, lambda: self.show_error_dialog(self.t("errors.open.title"),
-                                                              self.t("errors.open.body", file=job.name), width=460))
-        if on_first:
-            self._start_first()
-            return
-        if nxt is None:
-            self.go_home()
-            return
-        if was_current:
-            self._switch_to(b.current)
-        else:
-            self.on_batch_changed()
 
     def _touch(self, job: Job):
         for old in self.state.touch(job):

@@ -29,7 +29,6 @@ PAPER = {"light": "#EFECE3", "dark": "#3A3830"}
 CHECK = {"light": ("#FFFFFF", "#E6E8EC"), "dark": ("#2A2A2A", "#1C1C1C")}
 
 
-
 def _hue_bar() -> Image.Image:
     """Hue bar 378 × 12, radius 4, on the dialog colour (static: cached)."""
     hw = S(378)
@@ -40,6 +39,7 @@ def _hue_bar() -> Image.Image:
     hb = Image.new("RGBA", hue.size, gfx.rgba(Theme.c("dialog")))
     hb.paste(hue, (0, 0), hm)
     return hb
+
 
 class _Board(Box):
     def __init__(self, master, dlg):

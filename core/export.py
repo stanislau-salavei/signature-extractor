@@ -774,14 +774,15 @@ class ExportJob:
 
 
 def build_outputs(job: ExportJob, outline: Optional[TracedOutline] = None,
-                  centerline: Optional[Centerline] = None) -> dict:
-    """Render every selected format into bytes {fmt: bytes}."""
+                  centerline: Optional[Centerline] = None, png: Optional[bytes] = None) -> dict:
+    """Render every selected format into bytes {fmt: bytes}.  ``png`` — the same PNG file already made for
+    the preview (audit B10: core.export_preview checks that source, geometry, colour and DPI match)."""
     sw, sh = job.source.size_px
     geom = compute_geometry(sw, sh, job.source.dpi, job.size, job.margin_mm)
     out = {}
     if "PNG" in job.formats:
         dpi = effective_png_dpi(job.source, job.size, job.png_dpi)
-        out["PNG"] = png_bytes(render_png(job.source, geom, job.rgb, dpi), dpi)
+        out["PNG"] = png if png is not None else png_bytes(render_png(job.source, geom, job.rgb, dpi), dpi)
     if "SVG" in job.formats:
         if job.svg_mode == "stroke":
             if centerline is None:

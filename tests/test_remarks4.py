@@ -67,7 +67,7 @@ def test_settings_default_resets_remembered_mode(tmp_path, monkeypatch):
 
 
 def test_export_card_remembers_mode_in_last_export():
-    src = (ROOT / "ui" / "pages" / "export_page.py").read_text(encoding="utf-8")
+    src = "".join(p.read_text(encoding="utf-8") for p in [ROOT / "ui" / "pages" / "export_page.py", *sorted((ROOT / "ui" / "pages" / "export").glob("*.py"))])   # remark 112: screen 3 in parts
     body = src[src.index("    def set_svg_mode"):src.index("    def apply_svg_line")]
     assert 'last["svg_mode"] = mode' in body and 'settings.set("svg_mode"' not in body
     assert '"svg_mode": self.svg_mode' in src[src.index("    def remember"):]
@@ -83,7 +83,7 @@ def test_settings_svg_mode_moved_to_own_card():
 
 # ------------------------------------------------------------------ 30: «Справка» page
 def test_menu_help_opens_page_and_context_help_stays_dialog():
-    src = (ROOT / "ui" / "app.py").read_text(encoding="utf-8")
+    src = "".join((ROOT / "ui" / f).read_text(encoding="utf-8") for f in ("app.py", "keys.py", "open_flow.py", "report.py"))   # remark 112
     body = src[src.index("    def open_help("):src.index("    def _hide_help")]
     assert "HelpPage" in body and "HelpWindow" not in body
     for fn in ("open_help_prep", "open_formats_help"):
@@ -122,7 +122,7 @@ def test_process_and_batch_sections_have_headings():
 
 # ------------------------------------------------------------------ 31: screen 3 «Назад»
 def test_export_back_button_is_secondary_like_screen_2():
-    src = (ROOT / "ui" / "pages" / "export_page.py").read_text(encoding="utf-8")
+    src = "".join(p.read_text(encoding="utf-8") for p in [ROOT / "ui" / "pages" / "export_page.py", *sorted((ROOT / "ui" / "pages" / "export").glob("*.py"))])   # remark 112: screen 3 in parts
     assert re.search(r'self\.back = Button\(self, "", kind="secondary", icon="arrow_left", bg="abar"', src)
     pp = (ROOT / "ui" / "pages" / "process_page.py").read_text(encoding="utf-8")
     assert re.search(r'self\.back = Button\(self, app\.t\("common\.back"\), icon="arrow_left", bg="abar"', pp)

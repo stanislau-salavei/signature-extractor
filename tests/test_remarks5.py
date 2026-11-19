@@ -146,7 +146,7 @@ def test_new_install_default_1200(settings_mod):
 
 
 def test_export_page_uses_effective_dpi_everywhere():
-    src = (ROOT / "ui" / "pages" / "export_page.py").read_text(encoding="utf-8")
+    src = "".join(p.read_text(encoding="utf-8") for p in [ROOT / "ui" / "pages" / "export_page.py", *sorted((ROOT / "ui" / "pages" / "export").glob("*.py"))])   # remark 112: screen 3 in parts
     assert "png_eff_dpi()" in src[src.index("    def tag_text"):src.index("    def schedule_preview")]
     assert "dpi=ex.dpi_label(eff)" in src and '["300", "600", "1200 DPI"]' in src
     assert "self.png_dpi)" not in src[src.index("    def _png_key"):src.index("    def png_ready")]
