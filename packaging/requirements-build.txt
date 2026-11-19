@@ -1,0 +1,3 @@
+# Stage 6: build tools (Windows, GitHub Actions); runtime libraries are in ../requirements.txt
+pyinstaller>=6.10
+pyinstaller-hooks-contrib>=2024.8

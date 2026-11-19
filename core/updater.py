@@ -26,6 +26,16 @@ from typing import Callable, Optional, Tuple
 log = logging.getLogger(__name__)
 
 API_LATEST = "https://api.github.com/repos/stanislau-salavei/signature-extractor/releases/latest"
+API_ENV = "SE_UPDATE_API"         # stage 6 (D7): «…/repos/<owner>/<test-repo>/releases/latest» for testing updates
+
+
+def api_url() -> str:
+    """``releases/latest`` of the project; the environment variable SE_UPDATE_API replaces it (update tests
+    against a separate test repository, the published releases are not touched)."""
+    v = (os.environ.get(API_ENV) or "").strip()
+    return v if v.startswith(("https://", "http://")) else API_LATEST
+
+
 USER_AGENT = "signature-extractor-updater"
 TIMEOUT = 8.0
 CHUNK = 64 * 1024

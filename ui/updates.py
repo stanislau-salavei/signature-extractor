@@ -30,7 +30,7 @@ class UpdateController:
         self.app = app
         self.fetcher: Optional[Callable[[str], bytes]] = None
         self.opener = None
-        self.api_url = U.API_LATEST
+        self.api_url = U.api_url()          # stage 6: SE_UPDATE_API points a test build at a test repository
         self.dest_dir = None
         from ui import platform_win
         self.launcher: Callable = platform_win.launch_installer

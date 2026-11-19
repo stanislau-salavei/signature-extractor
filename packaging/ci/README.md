@@ -1,0 +1,1 @@
+`build-installer.yml` — workflow GitHub Actions для сборки установщика. Его место — `.github/workflows/build-installer.yml`; здесь он лежит, пока у токена, которым делается push, нет права `workflow` (GitHub не принимает изменения в `.github/workflows` без него). Перенос — одной командой: `git mv packaging/ci/build-installer.yml .github/workflows/build-installer.yml`.

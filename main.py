@@ -22,6 +22,8 @@ def main(argv=None) -> int:
     files = [Path(a) for a in argv if not a.startswith("--") and a not in ("ru", "en")]
     if files:
         app.root.after(200, lambda: app.open_paths(files))
+    from ui.smoke import maybe_schedule
+    maybe_schedule(app)                       # stage 6: SE_SMOKE_REPORT — self-check of the built program
     app.run()
     return 0
 
