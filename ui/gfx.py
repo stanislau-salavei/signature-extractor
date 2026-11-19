@@ -421,7 +421,6 @@ def _dash_band(segments, lw: float, color: str, x: int, y: int, w: int, h: int,
 
 def checker(w: int, h: int, cell: int, c1: str, c2: str) -> Image.Image:
     """Checkerboard in device px."""
-    import numpy as np
     yy, xx = np.mgrid[0:h, 0:w]
     m = ((xx // cell + yy // cell) % 2).astype(bool)
     a, b = np.array(rgb(c1), dtype=np.uint8), np.array(rgb(c2), dtype=np.uint8)

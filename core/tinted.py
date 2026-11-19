@@ -4,7 +4,11 @@ white balance against the paper (each channel / its blurred background) the hand
 than the print, the table lines and the stamp: the pen ink is the group of dark stroke-interior pixels
 that lies furthest from the paper tint.  Every dark pixel close to such an ink pixel is kept."""
 from typing import Optional
-import numpy as np, cv2
+
+import cv2
+import numpy as np
+
+from core.processing import _components, long_lines
 
 PAPER_TINT_C = 20.0      # paper chroma (Lab) from which the paper counts as tinted; white paper ≤ 7, yellow 38–49
 MIN_GAP = 5.0            # the two groups along the tint direction must be this far apart
@@ -93,7 +97,6 @@ def tinted_ink(rgb: np.ndarray, lab: np.ndarray, core: np.ndarray, ppm: float) -
     A_ = (wlab[..., 1] - 128.0)[inner][sel]; B_ = (wlab[..., 2] - 128.0)[inner][sel]
     ink_c = np.array([np.median(A_[lk == ci]), np.median(B_[lk == ci])]); prt_c = np.array([np.median(A_[lk != ci]), np.median(B_[lk != ci])])
     # decide per stroke piece, not per pixel: table lines are cut out first so they don't glue print to ink
-    from core.processing import long_lines, _components
     lines = long_lines(core, ppm)
     body = core & ~lines if lines is not None else core.copy()
     n, lbl, st, _ = _components(body)

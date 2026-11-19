@@ -14,7 +14,14 @@ from tkinter import filedialog
 from typing import Callable, List, Optional
 
 from core import export as ex
+from core.version import LICENSE_URL, RELEASE_TAG, REPO_URL  # remark 84 / 118 (A13): one place
 from ui import gfx
+from ui.dialogs import sizes as SZ
+from ui.dialogs.color_dialog import CustomColorDialog
+from ui.dialogs.colors import (add_color, color_items, color_name, confirm_delete_color, edit_color, find_custom,
+    set_default_color)
+from ui.dialogs.content import ContentDialog, wrap_runs
+from ui.dialogs.sizes import SizeDialog, confirm_delete_size
 from ui.theme import S, Theme, elide, text_width
 from ui.widgets.base import Box
 from ui.widgets.controls import Button, CheckRow, ComboBox, IconButton, Link, Radio, TextBox, Toggle
@@ -29,7 +36,6 @@ SVG_LINE_ROW_H = 64     # remark 32: «Толщина SVG» card, second row «�
 DPI_COMBO_MIN = 120
 GAP = 7
 GROUP_GAP = 28          # + header 20 + 8 = 56 between groups
-from core.version import LICENSE_URL, RELEASE_TAG, REPO_URL  # noqa: E402  remark 84 / 118 (A13): one place
 PAGE_MAX_W = 1000      # stage 5 (2k_25 / 2k_27): .col {max-width: 1000px; margin: 0 auto}
 SIZE_ROW_H = 40         # 36: rows of «Размеры подписи» 40 apart, first centre 24 below the divider
 SIZE_BTN_H = 32
@@ -67,7 +73,6 @@ class SCard(Box):
         extra = [note] if note else []
         if not desc or self.desc_room is None or text_width(desc, 12) <= self.desc_room:
             return ([desc] if desc else []) + extra
-        from ui.dialogs.content import wrap_runs
         return ["".join(t for t, _ in ln).rstrip() for ln in wrap_runs([(desc, "normal")], self.desc_room, 12)] + extra
 
     def head_h(self) -> float:
@@ -245,7 +250,6 @@ class SettingsPage(Box):
 
     def _size_options(self):
         """[(key, label, saved size or None)]: «Как в исходнике», «15 × 5 мм», then the user's sizes (36)."""
-        from ui.dialogs import sizes as SZ
         t = self.app.t
         opts = [(ex.SIZE_ORIGINAL, t("export.size.as_original"), None), (ex.SIZE_15X5, t("export.size.preset_15x5"), None)]
         for sz in SZ.custom_sizes(self.app):
@@ -289,7 +293,6 @@ class SettingsPage(Box):
 
     def _color_items(self):
         """[(key, name, hex | None, is_custom)] — «Как на фото», built-in colours, own colours (47)."""
-        from ui.dialogs.colors import color_items
         return color_items(self.app)
 
     def _default_color(self) -> str:
@@ -297,7 +300,6 @@ class SettingsPage(Box):
         return key if any(k == key for k, *_ in self._color_items()) else ex.DEFAULT_COLOR_KEY
 
     def _color_summary(self):
-        from ui.dialogs.colors import color_name
         return color_name(self.app, self._default_color())
 
     def _colors_body_h(self):
@@ -346,7 +348,6 @@ class SettingsPage(Box):
         return True
 
     def _set_size(self, key):
-        from ui.dialogs import sizes as SZ
         SZ.set_default_size(self.app, key)
         self.sync()
 
@@ -367,15 +368,12 @@ class SettingsPage(Box):
         MenuPopup(self.app, items, x - 4, y + h - 2, align_right=True, min_width=160)
 
     def _add_size(self):
-        from ui.dialogs.sizes import SizeDialog
         SizeDialog(self.app, None, lambda key: self.sync())
 
     def _edit_size(self, sz):
-        from ui.dialogs.sizes import SizeDialog
         SizeDialog(self.app, sz, lambda key: self.sync())
 
     def _delete_size(self, sz):
-        from ui.dialogs.sizes import confirm_delete_size
         confirm_delete_size(self.app, sz, self.sync)
 
     def _color_menu(self, i):
@@ -394,18 +392,13 @@ class SettingsPage(Box):
         MenuPopup(self.app, menu, x - 4, y + h - 2, align_right=True, min_width=160)
 
     def _set_color_key(self, key):
-        from ui.dialogs.colors import set_default_color
         set_default_color(self.app, key)
         self.sync()
 
     def _add_color(self):
-        from ui.dialogs.color_dialog import CustomColorDialog
-        from ui.dialogs.colors import add_color
         CustomColorDialog(self.app, None, lambda name, hx: (add_color(self.app, name, hx), self.sync()))
 
     def _edit_color(self, key):
-        from ui.dialogs.color_dialog import CustomColorDialog
-        from ui.dialogs.colors import edit_color, find_custom
         c = find_custom(self.app, key)
         if c is None:
             return
@@ -413,7 +406,6 @@ class SettingsPage(Box):
                           edit=c)
 
     def _delete_color(self, key):
-        from ui.dialogs.colors import confirm_delete_color
         return confirm_delete_color(self.app, key, self.sync)
 
     def _apply_margin(self, text):
@@ -448,7 +440,6 @@ class SettingsPage(Box):
 
     def _confirm_reset(self):
         """Remark 37: «Сбросить настройки?» like «О программе» — red «Сбросить» + «Отмена», Esc = Отмена."""
-        from ui.dialogs.content import ContentDialog
         t = self.app.t
         ContentDialog(self.app, t("dialog.reset.title"), t("dialog.reset.body"),
                       [(t("settings.reset.button"), "danger", self.app.reset_settings),

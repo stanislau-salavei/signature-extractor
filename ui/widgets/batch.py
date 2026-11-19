@@ -10,9 +10,10 @@ from PIL import Image, ImageDraw, ImageTk
 
 from ui import gfx
 from ui.theme import F, S, Scale, Theme, elide, text_width
+from ui.widgets import scroll as SB
 from ui.widgets.base import Box, Control, Tooltip
 from ui.widgets.controls import Button, IconButton, Link
-from ui.widgets import scroll as SB
+from ui.widgets.overlay import Popup, _paste_clip, grab_window
 
 log = logging.getLogger(__name__)
 
@@ -54,12 +55,10 @@ class InfoBar(Box):
         return any(text_width(ln, 12.5) > room for ln in self.lines())
 
     def _tip(self):
-        from ui.widgets.base import Tooltip
         if self.elided():
             Tooltip.schedule(self, lambda: self.msg)
 
     def _untip(self):
-        from ui.widgets.base import Tooltip
         Tooltip.cancel(self)
 
     def set(self, title: str, msg: str = "", action: str = "", link: str = "") -> None:
@@ -460,7 +459,6 @@ class PhotoStrip(Box):
         self.scroll_to(self.scroll + d * max(PITCH, (self.view_w() // PITCH - 1) * PITCH))
 
     def wheel(self, delta):
-        from ui.widgets.overlay import Popup
         if Popup.current is not None:
             return
         self.scroll_to(self.scroll - delta / 120 * PITCH)
@@ -517,7 +515,6 @@ class PhotoStrip(Box):
 
 
 def _paste(dst, src, X, Y):
-    from ui.widgets.overlay import _paste_clip
     _paste_clip(dst, src, X, Y)
 
 
@@ -536,7 +533,6 @@ class DimLayer:
         self._render()
 
     def _render(self):
-        from ui.widgets.overlay import grab_window
         if self.rect is None:
             return
         x, y, w, h = self.rect

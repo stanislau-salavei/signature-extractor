@@ -13,6 +13,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
+from core.settings import get_app_data_dir
+
 LOG_NAME = "signature_extractor.log"
 MAX_BYTES = 1_000_000          # ~1 MB per file
 BACKUPS = 3                    # signature_extractor.log.1 … .3
@@ -24,7 +26,6 @@ _handler: Optional[RotatingFileHandler] = None
 
 def log_path(app_dir: Optional[Path] = None) -> Path:
     if app_dir is None:
-        from core.settings import get_app_data_dir
         app_dir = get_app_data_dir()
     return Path(app_dir) / LOG_NAME
 

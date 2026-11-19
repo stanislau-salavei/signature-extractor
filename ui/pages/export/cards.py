@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import List
 
 from core import batch as B
@@ -10,7 +11,7 @@ from ui import gfx
 from ui.theme import F, S, Scale, Theme, blend, elide, text_width
 from ui.widgets.base import Box, Control
 from ui.widgets.controls import ComboBox, IconButton, Link, Radio, Segmented, TextBox, Toggle
-from ui.widgets.overlay import MenuItem, MenuPopup
+from ui.widgets.overlay import MenuItem, MenuPopup, widget_rect
 
 log = logging.getLogger(__name__)
 
@@ -41,13 +42,11 @@ TILE = {  # format tile colours (light, dark): fg, bg
 
 
 def _num_allowed(text: str) -> bool:
-    import re
     return re.fullmatch(r"\d{0,3}([.,]\d?)?", text) is not None
 
 
 def _line_allowed(text: str) -> bool:
     """DXF line thickness: up to 5 mm with two decimals (0,18)."""
-    import re
     return re.fullmatch(r"\d?([.,]\d{0,2})?", text) is not None
 
 
@@ -169,7 +168,6 @@ class Swatch(Control):
             self.bind("<ButtonPress-3>", self._ctx)
 
     def _ctx(self, e):
-        from ui.widgets.overlay import widget_rect
         x, y, w, h = widget_rect(self.page.app.root, self)
         MenuPopup(self.page.app, [MenuItem(self.page.app.t("common.delete"),
                                            lambda: self.page.ask_delete_color(self.key), "trash")],

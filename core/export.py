@@ -24,12 +24,14 @@ import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image
+
+from core.centerline import centerline_paths
 
 try:
     import cv2
@@ -583,7 +585,6 @@ class Centerline:
 def trace_centerline(source: ExportSource, geom: Geometry) -> Centerline:
     """Skeleton of the 50 % mask at trace resolution, lightly blurred first so the edge
     noise does not grow spurs; then mapped to millimetres."""
-    from core.centerline import centerline_paths
 
     ppm = _trace_resolution(source, geom)
     tw = max(1, int(round(geom.content_w_mm * ppm)))

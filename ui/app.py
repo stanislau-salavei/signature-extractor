@@ -14,23 +14,38 @@ from typing import List, Sequence
 import customtkinter as ctk
 
 from core import processing as P
+from core import window_geom as WG
+
+# Job / EditState live in core.batch since stage 4 (one class for a single photo and a batch item)
+from core.batch import LOADED_MAX, Batch, EditState, Job  # noqa: F401  (re-exported for tests)
 from core.i18n import I18n
+from core.logs import tk_callback_error
 from core.settings import SettingsManager
 from core.state import AppState
+
+# remark 84: Git tag v1.0 (not v1.0.0); RELEASE_TAG, REPO_URL, LICENSE_URL are used as A.* (about dialog, tests)
+from core.version import LICENSE_URL, RELEASE_TAG, REPO_URL, VERSION  # noqa: F401
 from core.worker import BackgroundWorker
 from ui import gfx, platform_win
+from ui.dialogs.about import AboutDialog
+from ui.dialogs.content import ContentDialog
+from ui.dialogs.formats_help import HelpWindow
+from ui.keys import KeysMixin
+from ui.open_flow import OpenFlowMixin
+from ui.pages.export_page import ExportPage
+from ui.pages.help_page import HelpPage
+from ui.pages.import_page import ImportPage
+from ui.pages.process_page import ProcessPage
+from ui.pages.settings_page import SettingsPage
+from ui.report import ReportMixin
+from ui.shell import Header
 from ui.theme import HEADER_H, Fonts, Scale, Theme
 from ui.widgets.base import Registry, Tooltip
 from ui.widgets.overlay import MenuItem, MenuPopup, Popup, TooltipLayer, widget_rect
-from ui.keys import KeysMixin
-from ui.open_flow import OpenFlowMixin
-from ui.report import ReportMixin
 
 log = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-# remark 84: Git tag v1.0 (not v1.0.0); RELEASE_TAG, REPO_URL, LICENSE_URL are used as A.* (about dialog, tests)
-from core.version import LICENSE_URL, RELEASE_TAG, REPO_URL, VERSION   # noqa: E402, F401
 CLIENT_W, CLIENT_H = 1280, 768      # 1280 × 800 together with the 32 px title bar (mockups)
 MIN_W, MIN_H = 1024, 648            # 1024 × 680 window
 
@@ -53,10 +68,6 @@ except Exception:  # pragma: no cover
 
     class _Root(ctk.CTk):
         dnd_ok = False
-
-
-# Job / EditState live in core.batch since stage 4 (one class for a single photo and a batch item)
-from core.batch import LOADED_MAX, Batch, EditState, Job  # noqa: E402  (re-exported for tests)
 
 
 def _state(name: str, doc: str = ""):
@@ -84,7 +95,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         self.i18n = I18n(ROOT_DIR / "i18n" / "strings_ru_en.csv", self.settings.effective_language())
         self.settings.fix_save_folder(self.t("export.default_folder"))      # remark 83
         self.root = _Root()
-        from core.logs import tk_callback_error
         self.root.report_callback_exception = tk_callback_error      # remark 81: callback errors go to the log
         gfx.clear_cache()      # PhotoImages belong to one Tk interpreter (several apps in one test run)
         self.root.withdraw()
@@ -98,8 +108,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         self._set_icon()
         self._apply_initial_geometry()      # remark 92: remembered size, centred, fitted to the screen
 
-        from ui.shell import Header
-        from ui.pages.import_page import ImportPage
         self.header = Header(self.root, self)
         self.import_page = ImportPage(self.root, self)
         self.process_page = None
@@ -236,7 +244,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
     def _apply_initial_geometry(self):
         """Size and maximized state from the last launch; the position is not remembered — centred in the
         work area; a size larger than the current screen is reduced to fit."""
-        from core import window_geom as WG
         scale = self._window_scale()
         w, h, x, y, maxi, mw, mh = WG.initial_geometry(
             self.settings.get("window"), platform_win.work_area(self.root), platform_win.frame_extra(self.root),
@@ -284,7 +291,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
 
     def save_window_state(self):
         """Remember the normal size and the maximized flag (logical px) in settings.json."""
-        from core import window_geom as WG
         try:
             w, h = getattr(self, "_normal_size", (CLIENT_W, CLIENT_H))
             val = WG.to_saved(w, h, getattr(self, "_was_maximized", False))
@@ -351,10 +357,8 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         self.state.set_page(name)
         Popup.close_current()
         if name == "process" and self.process_page is None:
-            from ui.pages.process_page import ProcessPage
             self.process_page = ProcessPage(self.root, self)
         if name == "export" and self.export_page is None:
-            from ui.pages.export_page import ExportPage
             self.export_page = ExportPage(self.root, self)
         self.import_page.drop.set_mode("busy" if name == "busy" else "idle")
         if name == "process":
@@ -383,7 +387,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         if self.help_open:
             self._hide_help()
         if self.settings_page is None:
-            from ui.pages.settings_page import SettingsPage
             self.settings_page = SettingsPage(self.root, self)
         self.settings_open = True
         Popup.close_current()
@@ -428,7 +431,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         """Remark 71: ⋯ › «Начать заново» always asks «Начать заново?», then goes to screen 1."""
         if self.saving or not self.has_photos():
             return
-        from ui.dialogs.content import ContentDialog
 
         def go():
             if self.settings_open:
@@ -449,7 +451,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
             self.settings_open = False
             self.settings_page.hide()
         if self.help_page is None:
-            from ui.pages.help_page import HelpPage
             self.help_page = HelpPage(self.root, self)
         self.help_open = True
         Popup.close_current()
@@ -476,15 +477,12 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
             cur.area.bind_wheel()      # hide() unbound the wheel of the page under the help page
 
     def open_help_prep(self):
-        from ui.dialogs.formats_help import HelpWindow
         HelpWindow.open(self, "prep")
 
     def open_formats_help(self):
-        from ui.dialogs.formats_help import HelpWindow
         HelpWindow.open(self, "formats")
 
     def open_about(self):
-        from ui.dialogs.about import AboutDialog
         AboutDialog(self)
 
     @property
@@ -586,7 +584,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         if self.saving:
             return
         if self.has_unsaved():
-            from ui.dialogs.content import ContentDialog
             ContentDialog(self, self.t("dialog.restart.title"), self.t("dialog.restart.body"),
                           [(self.t("dialog.restart.ok"), "primary", then), (self.t("common.cancel"), "secondary", None)])
         else:
@@ -595,7 +592,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         # remark 74: «no signature» is the yellow card under the image (process_page.layout), not dialog 30
 
     def show_error_dialog(self, title, body, width=420, retry=None, on_cancel=None):
-        from ui.dialogs.content import ContentDialog
         if retry:
             buttons = [(self.t("errors.retry"), "primary", retry), (self.t("common.cancel"), "secondary", on_cancel)]
         else:
@@ -692,7 +688,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         """«Убрать» → dialog 15."""
         if self.batch is None or self.job is None or self.saving:
             return
-        from ui.dialogs.content import ContentDialog
         job = self.job
         ContentDialog(self, self.t("batch.remove_title"), self.t("batch.remove_body", file=job.name),
                       [(self.t("common.remove"), "primary", lambda: self.remove_photo(job)),
@@ -735,7 +730,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
             self.process_job(j, background=True)
         self.on_batch_changed()
         if scan.skipped_other:
-            from ui.dialogs.content import ContentDialog
             ContentDialog(self, self.t("import.skipped_title"),
                           self.tn("import.skipped_body", len(scan.skipped_other), photos=len(added)),
                           [(self.t("common.got_it"), "primary", None)], width=440)
@@ -746,7 +740,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         b, job = self.batch, self.job
         if b is None or job is None or self.saving:
             return
-        from ui.dialogs.content import ContentDialog
         others = len(b) - 1
         ContentDialog(self, self.t("dialog.apply_all.title"), self.tn("dialog.apply_all.body", others),
                       [(self.t("dialog.apply_all.ok"), "primary", self._apply_to_all_now),
@@ -769,7 +762,6 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
         """«Подробнее» → 47."""
         if self.batch is None:
             return
-        from ui.dialogs.content import ContentDialog
         files = self.batch.skipped_large
         rows = []
         for f in files:

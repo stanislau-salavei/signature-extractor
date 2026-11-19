@@ -18,6 +18,7 @@ from PIL import Image, ImageGrab, ImageTk
 from ui import gfx
 from ui.theme import F, S, Scale, Theme, elide, text_width
 from ui.widgets.base import Tooltip
+from ui.widgets.scroll import REPEAT_FIRST_MS, REPEAT_MS, ZONE_W, Widening, bar_geometry, bar_zone, draw_bar
 
 log = logging.getLogger(__name__)
 
@@ -325,7 +326,6 @@ class ListPopup(Popup):
         self._sb_drag = None
         self._sb_pressed = False
         self._sb_repeat = None
-        from ui.widgets.scroll import Widening
         self.sb = Widening(self.cv, self._sb_redraw, lambda: self._sb_hover or self._sb_drag is not None)
         self.show_base(x, y, w, h, 8)
         self.draw_items()
@@ -393,11 +393,9 @@ class ListPopup(Popup):
 
     # remark 79: Win11 bar (ui/widgets/scroll.py) inside the list, right of the items, 1 px inside the border
     def _sb_geo(self):
-        from ui.widgets.scroll import bar_geometry
         return bar_geometry(self.pw - 1, 0.0, self.ph, self.sb.t, self.ph, self.content_h, self.scroll)
 
     def _sb_in_zone(self, x) -> bool:
-        from ui.widgets.scroll import ZONE_W
         return x is not None and self.content_h > self.ph and x >= self.pw - 1 - ZONE_W
 
     def _sb_redraw(self):
@@ -405,7 +403,6 @@ class ListPopup(Popup):
             self.draw_items()
 
     def _draw_scrollbar(self):
-        from ui.widgets.scroll import draw_bar
         g = self._sb_geo()
         if g:
             draw_bar(self.cv, g, self.sb.t, Theme.c("menu"), lambda x, y, key, f: self.put_cached(x, y, key, f, tags="items"))
@@ -413,7 +410,6 @@ class ListPopup(Popup):
     def _sb_step(self, d, first=False):
         if self.closed:
             return
-        from ui.widgets.scroll import REPEAT_FIRST_MS, REPEAT_MS
         self.wheel(-d)
         self._sb_repeat = self.root.after(REPEAT_FIRST_MS if first else REPEAT_MS, lambda: self._sb_step(d))
 
@@ -428,7 +424,6 @@ class ListPopup(Popup):
     def press(self, x, y):
         if not self._sb_in_zone(x):
             return
-        from ui.widgets.scroll import bar_zone
         self._sb_pressed = True
         self.sb.expand()
         g = self._sb_geo()
@@ -545,7 +540,7 @@ class TooltipLayer:
         wrap = getattr(owner, "tip_wrap", None)
         lines = [text]
         if wrap and text_width(text, 12) > wrap - 20:
-            from ui.dialogs.content import wrap_runs
+            from ui.dialogs.content import wrap_runs     # remark 114: lazy — ui.dialogs.content imports this module
             lines = ["".join(t for t, _ in ln).strip() for ln in wrap_runs([(text, "normal")], wrap - 20, 12)]
         tw = max(text_width(ln, 12) for ln in lines)
         w = round(tw + 18 + 2 + 0.5) if len(lines) == 1 else round(wrap)

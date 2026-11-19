@@ -9,8 +9,9 @@ import tkinter as tk
 from typing import Callable, List, Optional, Sequence
 
 from ui import gfx
-from ui.theme import F, S, Scale, Theme, elide, text_width
+from ui.theme import F, S, Scale, Theme, _hex, elide, rgb, text_width
 from ui.widgets.base import Box, Control
+from ui.widgets.overlay import ListPopup, Popup, widget_rect
 
 log = logging.getLogger(__name__)
 
@@ -166,7 +167,6 @@ class Link(Control):
 
 
 def gfx_mix(c1: str, c2: str, t: float) -> str:
-    from ui.theme import rgb, _hex
     a, b = rgb(c1), rgb(c2)
     return _hex(tuple(a[i] + (b[i] - a[i]) * t for i in range(3)))
 
@@ -339,7 +339,6 @@ class ComboBox(Control):
         return w - 12 - sw - 8 - self.chev_px - 10
 
     def show_list(self):
-        from ui.widgets.overlay import ListPopup, widget_rect
         if not self.items:
             return
         self.open = True
@@ -551,7 +550,6 @@ class TextBox(Box):
         """Stage 5: Esc in a field only drops the edit and the focus; the next Esc closes the page.
         Inside a dialog it goes on to the dialog (Esc = «Отмена»)."""
         self._revert()
-        from ui.widgets.overlay import Popup
         if Popup.current is not None:
             return None
         try:

@@ -23,6 +23,8 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 from PIL import Image
 
+from core import ruling as _R
+
 try:
     import cv2
 except ImportError:  # pragma: no cover - cv2 is a hard requirement of the app
@@ -858,7 +860,7 @@ def _ink_stage(photo: Photo, params: ProcessParams, alpha: np.ndarray, core: np.
                 if params.exclude_rgb is not None:
                     alpha = alpha * exclude_weight(photo, ink_rgb, params.exclude_rgb)
         else:
-            from core import tinted as _T          # remark 73: tinted (yellow) paper
+            from core import tinted as _T  # remark 73: tinted paper; lazy (114): core.tinted imports this
             tw = _T.tinted_ink(photo.rgb, photo.lab, core, photo.work_dpi / 25.4)
             if tw is not None:
                 ink_state = "found"; det_rgb = ink_rgb = tw["ink_rgb"]; stamp_like = False
@@ -894,14 +896,13 @@ def _mask_stage(photo: Photo, params: ProcessParams, ink: _Ink) -> Tuple[np.ndar
 
     rl = None
     if mask.any():      # remark 72: plain ruling (+73: inside a table every straight line goes)
-        from core import ruling as _R
         rl = _R.ruling(mask, photo.work_dpi / 25.4, table=tw is not None)
         if rl is not None:
             fringe = (cv2.dilate(rl.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0) & ~mask
             alpha[rl | fringe] = 0.0
             mask &= ~rl
     if tw is not None and mask.any():     # remark 73: rejoin cut strokes, drop dashes, dust and ticks
-        from core import tinted as _T
+        from core import tinted as _T     # remark 114: lazy — core.tinted imports this module
         lp = tw["lines"]
         if rl is not None:
             lp = rl if lp is None else (lp | rl)

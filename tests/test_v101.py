@@ -479,3 +479,25 @@ def test_b10_preview_png_reused_only_for_same_file(ex_source):
     assert m.png_bytes_for(ex_source, geom, (20, 30, 120), 300) is None
     g2 = ex.compute_geometry(*ex_source.size_px, ex_source.dpi, size, 2.0)
     assert m.png_bytes_for(ex_source, g2, (20, 30, 120), dpi) is None
+
+
+# ================================================================== 114: imports at the top
+def test_r114_lazy_imports_only_heavy_platform_or_cycles():
+    import shutil
+    import subprocess
+    import sys
+    ruff = shutil.which("ruff") or str(Path(sys.executable).with_name("ruff"))
+    if not Path(ruff).exists():
+        pytest.skip("ruff not installed")
+    r = subprocess.run([ruff, "check", "--no-cache", "--preview", "--select", "PLC0415", "--output-format", "concise",
+                        "core", "ui"], cwd=ROOT, capture_output=True, text=True)
+    allowed = ("potrace", "ezdxf", "pi_heif", "ui.updates", "ctypes", "winreg", "darkdetect", "PIL",
+               "core.tinted", "core import tinted", "ui.dialogs.content import wrap_runs", "ui.widgets.overlay import")
+    for line in r.stdout.splitlines():
+        if not line.startswith(("core", "ui")):
+            continue
+        f, n = line.split(":")[:2]
+        if f.replace("\\", "/") == "ui/smoke.py":      # the smoke test checks that the build can import them
+            continue
+        code = (ROOT / f).read_text(encoding="utf-8").splitlines()[int(n) - 1]
+        assert any(a in code for a in allowed), line

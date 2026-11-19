@@ -3,6 +3,8 @@ Every call is a silent no-op on other systems / older Windows."""
 from __future__ import annotations
 
 import logging
+import platform
+import subprocess
 import sys
 
 log = logging.getLogger(__name__)
@@ -83,7 +85,6 @@ def system_is_dark() -> bool:
 
 def windows_version() -> str:
     """«Windows 11 23H2 (build 22631)»; outside Windows — platform.platform()."""
-    import platform
     if not sys.platform.startswith("win"):
         return platform.platform()
     build, display = "", ""
@@ -157,7 +158,6 @@ def installer_command(path) -> list:
 
 def launch_installer(path) -> bool:
     """Start the downloaded installer detached from the app with the update flags (stage 6)."""
-    import subprocess
     try:
         release_instance_mutex()
         if sys.platform.startswith("win"):

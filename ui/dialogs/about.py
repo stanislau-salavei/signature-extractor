@@ -2,6 +2,7 @@
 footer «Сообщить о проблеме» + «ОК»."""
 from __future__ import annotations
 
+from core.version import LICENSE_URL, RELEASE_TAG, REPO_URL, VERSION
 from ui.dialogs.content import ContentDialog
 from ui.theme import text_width
 from ui.widgets.base import Box
@@ -23,8 +24,7 @@ class _Meta(Box):
 
 class AboutDialog(ContentDialog):
     def __init__(self, app):
-        from ui import app as A
-        app.VERSION_STR = getattr(A, "VERSION", "1.0")
+        app.VERSION_STR = VERSION
         t = app.t
         super().__init__(app, t("menu.about"), "", [
             (t("settings.report_issue"), "secondary", app.report_issue),
@@ -40,7 +40,6 @@ class AboutDialog(ContentDialog):
 
     def render(self):
         super().render()
-        from ui import app as A
         app = self.app
         t = app.t
         x, y = self.px + 25, self.py + 1 + 64
@@ -48,9 +47,9 @@ class AboutDialog(ContentDialog):
         meta.geom(x, y, 330, 160)
         meta.lift()
         self.widgets.append(meta)
-        links = [(t("settings.source_code"), A.REPO_URL, 0, 78),
-                 (t("settings.release_notes"), f"{A.REPO_URL}/releases/tag/{A.RELEASE_TAG}", 0, 108.1),
-                 ("GNU GPLv3", A.LICENSE_URL, text_width(t("settings.license"), 12.5) + 5.6, 138.2)]
+        links = [(t("settings.source_code"), REPO_URL, 0, 78),
+                 (t("settings.release_notes"), f"{REPO_URL}/releases/tag/{RELEASE_TAG}", 0, 108.1),
+                 ("GNU GPLv3", LICENSE_URL, text_width(t("settings.license"), 12.5) + 5.6, 138.2)]
         for label, url, lx, ly in links:
             lk = Link(self.root, label, 14, "link", bg="dialog", command=lambda u=url: app.open_url(u))
             lk.geom(x + lx, y + ly, lk.natural_width(), 18.2)

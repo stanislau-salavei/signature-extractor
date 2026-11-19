@@ -19,6 +19,10 @@ import threading
 from typing import Callable, Optional
 
 from core import updater as U
+from ui import platform_win
+from ui.dialogs.content import ContentDialog
+from ui.dialogs.update import UpdateDialog
+from ui.widgets.overlay import Popup
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +38,6 @@ class UpdateController:
         log.info("update check address: %s%s", self.api_url,                        # remark 93
                  f" ({U.API_ENV})" if self.api_url != U.API_LATEST else "")
         self.dest_dir = None
-        from ui import platform_win
         self.launcher: Callable = platform_win.launch_installer
         self.quit: Callable[[], None] = app.quit
         self._q: "queue.Queue" = queue.Queue()
@@ -114,7 +117,6 @@ class UpdateController:
 
     def _home(self) -> bool:
         a = self.app
-        from ui.widgets.overlay import Popup
         return (a.page == "import" and not a.settings_open and not a.help_open and not a.saving
                 and Popup.current is None)
 
@@ -129,7 +131,6 @@ class UpdateController:
 
     # ------------------------------------------------------------------ dialog 32 + download
     def show(self, rel: U.Release):
-        from ui.dialogs.update import UpdateDialog
         self.release = rel
         self.dialog = UpdateDialog(self.app, rel.version, self._download, self._later, self._cancel_download)
         return self.dialog
@@ -165,7 +166,6 @@ class UpdateController:
             return
         if dlg is not None and not dlg.closed:
             dlg.close()
-        from ui.dialogs.content import ContentDialog
         if exc is not None:
             log.warning("update download failed: %s", exc)
             ContentDialog(app, t("update.download_failed"), "", [(t("common.ok"), "primary", None)], width=420)

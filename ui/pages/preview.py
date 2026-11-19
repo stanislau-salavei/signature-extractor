@@ -11,7 +11,7 @@ import sys
 import time
 from typing import Optional, Tuple
 
-from PIL import Image, ImageChops, ImageDraw, ImageTk
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageTk
 
 from core import processing as P
 from ui import gfx
@@ -778,7 +778,6 @@ class Preview(Box):
 def _outlined_icon(name, size):
     """Eyedropper cursor: dark glyph with a white halo so it reads on any background."""
     base = gfx.icon(name, size, "#FFFFFF")
-    from PIL import ImageFilter
     halo = base.filter(ImageFilter.MaxFilter(3))
     glyph = gfx.icon(name, size, "#1A1A1A")
     halo.alpha_composite(glyph)

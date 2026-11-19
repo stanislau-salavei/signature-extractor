@@ -10,14 +10,15 @@
 Network access goes through ``fetch`` / ``open_stream`` so tests can replace it (local http.server)."""
 from __future__ import annotations
 
-import logging
 import datetime as _dt
 import hashlib
 import json
+import logging
 import os
 import re
 import tempfile
 import threading
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,7 @@ from typing import Callable, Optional, Tuple
 log = logging.getLogger(__name__)
 
 from core.version import API_LATEST  # noqa: E402  remark 118 (A13): the repository is written in core/version.py
+
 API_ENV = "SE_UPDATE_API"         # stage 6 (D7): «…/repos/<owner>/<test-repo>/releases/latest» for testing updates
 
 
@@ -58,7 +60,6 @@ def is_latest_endpoint(url: str) -> bool:
 
 def describe_error(exc: BaseException) -> str:
     """Remark 93: one line for the log — error class, HTTP code, rate limit and its reset time."""
-    import urllib.error
     parts = [type(exc).__name__]
     if isinstance(exc, urllib.error.HTTPError):
         parts.append(f"HTTP {exc.code} {exc.reason}")
@@ -154,7 +155,6 @@ def check_latest(current: str, api_url: str = API_LATEST, fetcher: Callable[[str
     """Never raises: no network / bad answer → «offline».  Remark 93: HTTP 404 from ``releases/latest``
     (the repository has no release yet) means there is nothing newer → «latest»; every failure is written to
     the log as a WARNING with the address, the error class and the HTTP code."""
-    import urllib.error
     fetcher = fetcher or fetch
     try:
         data = json.loads(fetcher(api_url).decode("utf-8"))

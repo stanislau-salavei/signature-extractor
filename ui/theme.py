@@ -7,6 +7,7 @@ re-rendered sharp at 100 / 125 / 150 %.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import tkinter as tk
 import tkinter.font as tkfont
@@ -204,7 +205,6 @@ class Fonts:
                 "Inter SemiBold", "Inter Semibold", "Selawik Semibold"]
         cls.semibold_family = next((f for f in semi if f in fams), None)
         cls.medium_family = None
-        import os
         if os.environ.get("SE_FONT_ALIASES") and cls.regular_family == "Inter":
             # dev/test on Linux: fontconfig aliases (tools/fonts.conf) give true 600 / 500 weights
             cls.semibold_family, cls.medium_family = "Inter SemiBold", "Inter Medium"

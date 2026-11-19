@@ -10,6 +10,7 @@ from typing import List
 from core import batch as B
 from core import processing as P
 from core.batch import Batch, Job
+from ui.dialogs.content import ContentDialog
 from ui.widgets.overlay import Popup
 
 log = logging.getLogger(__name__)
@@ -93,7 +94,6 @@ class OpenFlowMixin:
             go = lambda: self.start_processing(load)   # noqa: E731
         if scan.skipped_other:
             # 04: shown over screen 1 before processing; «Понятно» continues with the photos
-            from ui.dialogs.content import ContentDialog
             self.go_home()
             ContentDialog(self, self.t("import.skipped_title"),
                           self.tn("import.skipped_body", len(scan.skipped_other), photos=len(scan.photos)),

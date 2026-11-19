@@ -17,6 +17,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from core import export as ex
+
 log = logging.getLogger(__name__)
 
 APP_DIR_NAME = "Signature Extractor"
@@ -248,7 +250,6 @@ class SettingsManager:
     def delete_custom_color(self, key: str) -> str:
         """Stage 5: one action for screen 3 and Settings — remove an own colour; a deleted default
         colour gives «Синий» back; a remembered last-export colour is forgotten.  Returns the default."""
-        from core import export as ex
         cid = key[len(ex.CUSTOM_COLOR_PREFIX):] if key.startswith(ex.CUSTOM_COLOR_PREFIX) else key
         left, new_default = ex.remove_custom_color(list(self.data.get("custom_colors") or []), cid,
                                                    self.data.get("default_color", ex.DEFAULT_COLOR_KEY))

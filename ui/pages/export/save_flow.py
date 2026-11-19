@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog
 
 from core import batch as B
 from core import export as ex
 from core.export_preview import geom_key
+from ui.dialogs.content import ContentDialog
 from ui.theme import ACTION_BAR_H, HEADER_H, S, Theme, elide
 from ui.widgets.base import Box, Tooltip
 from ui.widgets.controls import Button
@@ -117,7 +119,6 @@ class SaveFlowMixin:
         except OSError:
             log.warning("cannot create save folder %s", folder)
         template = self.settings.name_template(t("settings.name_template.value"))
-        from datetime import datetime
         stem = self.source.name or datetime.now().strftime("%Y-%m-%d_%H%M%S")
         base = ex.sanitize_filename(ex.expand_template(template, stem))
         kwargs = dict(parent=self.app.root, initialdir=str(folder), initialfile=f"{base}.{fmts[0].lower()}",
@@ -139,7 +140,6 @@ class SaveFlowMixin:
         self.start_write(folder, base2, fmts)
 
     def ask_file_exists(self, folder, base, filename, fmts):
-        from ui.dialogs.content import ContentDialog
         t = self.app.t
         body = t("file_exists.body", folder="\x00F", file="\x00N").replace("\x00F", folder.name)
         a, _, b = body.partition("\x00N")
@@ -233,7 +233,6 @@ class SaveFlowMixin:
 
     def _ask_batch_exists(self, plan):
         """44: «Файл уже существует» with «Применить ко всем»."""
-        from ui.dialogs.content import ContentDialog
         t = self.app.t
         sess = self._sess
         filename = plan.conflicts[0].name

@@ -3,8 +3,10 @@ mixed into ``ui.app.App``)."""
 from __future__ import annotations
 
 import logging
+import urllib.parse
 
 from core.version import REPO_URL
+from ui import platform_win as pw
 
 log = logging.getLogger(__name__)
 
@@ -16,8 +18,6 @@ class ReportMixin:
         self.open_url(self.issue_url())
 
     def issue_url(self) -> str:
-        import urllib.parse
-        from ui import platform_win as pw
         body = self.t("issue.body", version=self.VERSION_STR, windows=pw.windows_version(),
                       lang=self.i18n.lang).replace("\\n", "\n")
         url = f"{REPO_URL}/issues/new?" + urllib.parse.urlencode({"body": body})

@@ -10,9 +10,11 @@ import logging
 import re
 from typing import List, Tuple
 
+from PIL import Image, ImageDraw
+
 from ui import gfx
 from ui.dialogs.content import ContentDialog, wrap_runs
-from ui.theme import F, S, Theme
+from ui.theme import F, S, Scale, Theme, blend, text_width
 from ui.widgets.base import Box
 from ui.widgets.scroll import ScrollArea
 
@@ -165,14 +167,11 @@ EX_BAD = ("shadow", "glare", "tiny", "skew")
 
 
 def _blend_hex(fg, a, base):
-    from ui.theme import blend
     return blend(fg, a, base)
 
 
 def _photo(name, w, h, radius, bg):
     """Example photo (assets/help/ex_<name>.png) cover-cropped to w × h logical px, rounded corners."""
-    from PIL import Image, ImageDraw
-    from ui.theme import Scale
     W, H = max(1, int(round(w * Scale.factor))), max(1, int(round(h * Scale.factor)))
     src = Image.open(gfx.ASSETS / "help" / f"ex_{name}.png").convert("RGB")
     sw, sh = src.size
@@ -217,7 +216,6 @@ class _Content(Box):
 
     # ------------------------------------------------------------------ text helpers
     def _runs(self, x, y, runs, width, px, lh, color="text", draw=True):
-        from ui.theme import text_width
         lines = wrap_runs(runs, width, px)
         if draw:
             for i, ln in enumerate(lines):

@@ -14,6 +14,7 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple
@@ -23,6 +24,7 @@ from PIL import Image
 from core import export as ex
 from core import processing as P
 from core.history import HistoryStack
+from core.i18n import ru_plural_category
 
 log = logging.getLogger(__name__)
 
@@ -305,10 +307,8 @@ class Batch:
 
 def summary_text(i18n, photos: int, formats: int, files: int) -> str:
     """«50 фото × 2 формата = 100 файлов» — three plural forms in one row (batch.summary)."""
-    import re
     key = "batch.summary"
     if i18n.lang == "ru":
-        from core.i18n import ru_plural_category
         text = i18n.strings.get(key, {}).get("ru", key)
         note = i18n.notes.get(key, "")
         groups = re.findall(r"([А-Яа-яё]+)/([А-Яа-яё]+)/([А-Яа-яё]+)", note)

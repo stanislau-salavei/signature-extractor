@@ -7,12 +7,13 @@ from typing import List, Optional
 
 from core import processing as P
 from ui import gfx
+from ui.dialogs.content import wrap_runs
 from ui.pages.preview import Preview
 from ui.theme import ACTION_BAR_H, HEADER_H, S, Theme, elide
-from ui.widgets.scroll import ScrollArea
-from ui.widgets.base import Box
+from ui.widgets.base import Box, Tooltip
 from ui.widgets.batch import STRIP_H, InfoBar, PhotoStrip
-from ui.widgets.controls import Button, Link, IconButton, Segmented, Slider, Toggle, ToolButton
+from ui.widgets.controls import Button, IconButton, Link, Segmented, Slider, Toggle, ToolButton
+from ui.widgets.scroll import ScrollArea
 
 log = logging.getLogger(__name__)
 
@@ -177,7 +178,6 @@ class InkCard(FilterCard):
             self.swatch.color = "#%02X%02X%02X" % tuple(rgb)
         self.hint_lines = []
         if params.ink_filter and not self.manual and self.state == "same":
-            from ui.dialogs.content import wrap_runs
             self.hint_lines = ["".join(t for t, _ in ln) for ln in
                                wrap_runs([(self.app.t("process.filter.ink_auto_same"), "normal")], RIGHT_W - 34, 13)]
         if not params.ink_filter:
@@ -188,7 +188,6 @@ class InkCard(FilterCard):
             self.body_h = 105
         self.ex_lines = []
         if params.ink_filter and self.manual:
-            from ui.dialogs.content import wrap_runs
             key = "process.filter.exclude_note" if self.ex_color else "process.filter.exclude_hint"
             self.ex_lines = ["".join(t for t, _ in ln) for ln in
                              wrap_runs([(self.app.t(key), "normal")], RIGHT_W - 34, 12)]
@@ -269,7 +268,6 @@ class _Swatch(Box):
         self.bind("<Leave>", lambda e: _cancel_tip(self))
 
     def _tip(self):
-        from ui.widgets.base import Tooltip
         Tooltip.schedule(self, lambda: self.color)  # HEX only in the tooltip
 
     def draw(self):
@@ -282,7 +280,6 @@ class _Swatch(Box):
 
 
 def _cancel_tip(w):
-    from ui.widgets.base import Tooltip
     Tooltip.cancel(w)
 
 

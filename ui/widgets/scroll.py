@@ -373,7 +373,7 @@ class ScrollArea(tk.Frame):
             w = getattr(w, "master", None)
 
     def _wheel(self, delta):
-        from ui.widgets.overlay import Popup
+        from ui.widgets.overlay import Popup     # remark 114: lazy — overlay imports this module
         if not self.in_popup and Popup.current is not None and self.winfo_toplevel() is Popup.current.root:
             return
         self.scroll_by(-delta / 120 * 48)

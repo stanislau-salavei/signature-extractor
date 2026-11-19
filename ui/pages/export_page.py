@@ -8,16 +8,36 @@ from typing import List, Optional
 from core import batch as B
 from core import export as ex
 from core.export_preview import ExportPreviewModel, geom_key
-from ui.theme import ACTION_BAR_H, HEADER_H
-from ui.widgets.base import Box
-from ui.widgets.scroll import ScrollArea
-from ui.widgets.batch import STRIP_H, DimLayer, PhotoStrip
-
+from ui.dialogs.color_dialog import CustomColorDialog
+from ui.dialogs.colors import confirm_delete_color
+from ui.dialogs.content import ContentDialog
+from ui.dialogs.sizes import confirm_delete_size
 from ui.pages.export.cards import (  # noqa: F401 — names used by tests and other screens
-    COLOR_DELETE_ROW_H, CUSTOM_GAP, LEFT_W, MARGIN_ROW_H, NUM_FIT, SIZE_COMBO_W, SVG_LINE_H, SVG_MODES_H, SWATCH_STEP,
-    TEMPLATE_ROW_H, TILE, Card, ColorCard, CountCard, FormatCard, InfoBar, SizeCard, Swatch)
+    COLOR_DELETE_ROW_H,
+    CUSTOM_GAP,
+    LEFT_W,
+    MARGIN_ROW_H,
+    NUM_FIT,
+    SIZE_COMBO_W,
+    SVG_LINE_H,
+    SVG_MODES_H,
+    SWATCH_STEP,
+    TEMPLATE_ROW_H,
+    TILE,
+    Card,
+    ColorCard,
+    CountCard,
+    FormatCard,
+    InfoBar,
+    SizeCard,
+    Swatch,
+)
 from ui.pages.export.preview_box import CHECKER, PreviewCard, _PreviewBox, preview_fit  # noqa: F401
 from ui.pages.export.save_flow import ExportBar, SaveFlowMixin  # noqa: F401
+from ui.theme import ACTION_BAR_H, HEADER_H
+from ui.widgets.base import Box
+from ui.widgets.batch import STRIP_H, DimLayer, PhotoStrip
+from ui.widgets.scroll import ScrollArea
 
 log = logging.getLogger(__name__)
 
@@ -274,7 +294,6 @@ class ExportPage(SaveFlowMixin, Box):
         return True
 
     def save_template(self):
-        from ui.dialogs.content import ContentDialog
         t = self.app.t
         default = self.wxh(self.custom_w, self.custom_h)
 
@@ -302,7 +321,6 @@ class ExportPage(SaveFlowMixin, Box):
         """Remark 34: «Удалить шаблон» — the same confirmation as Settings › «Размеры подписи» (51 / 56),
         shared since stage 5 (ui/dialogs/sizes.confirm_delete_size, red «Удалить»).  Afterwards
         «15 × 5 мм» is selected."""
-        from ui.dialogs.sizes import confirm_delete_size
         tpl = self.selected_template()
         if tpl is None:
             return
@@ -387,7 +405,6 @@ class ExportPage(SaveFlowMixin, Box):
 
     def ask_delete_color(self, key):
         """Remark 58: «Удалить цвет» and the right click ask first — the same dialog as in Settings."""
-        from ui.dialogs.colors import confirm_delete_color
         return confirm_delete_color(self.app, key, lambda: self._color_deleted(key))
 
     def _color_deleted(self, key):
@@ -397,7 +414,6 @@ class ExportPage(SaveFlowMixin, Box):
         self.changed()
 
     def add_color(self):
-        from ui.dialogs.color_dialog import CustomColorDialog
 
         def done(name, hx):
             colors = self.custom_colors()
