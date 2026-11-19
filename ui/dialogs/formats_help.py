@@ -148,6 +148,7 @@ def topic_blocks(app, topic):
 
 
 def card_titles(blocks):
+    """Test hook (remark 108): titles of the cards of a help topic."""
     return [d[1] for k, d in blocks if k == "card"]
 
 

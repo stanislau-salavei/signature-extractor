@@ -276,7 +276,7 @@ def _arrow_image(kind: str, hover: bool) -> Image.Image:
     return out
 
 
-class _HBar(Control):
+class _HBar(SB.BarMixin, Control):
     """Horizontal scrollbar under the thumbnails.  Remark 86: works like the other Windows 11 bars (remark 79,
     ui/widgets/scroll.py): at rest a 2 px line about 4 px under the tiles; on hover it widens smoothly to a 6 px
     thumb with a 12 px track and arrows at both ends; it narrows about 1 s after the pointer leaves.  An arrow
@@ -296,33 +296,12 @@ class _HBar(Control):
         self.bind("<B1-Motion>", self._move)
         self.wheel_handler = strip.wheel
 
-    @property
-    def t(self) -> float:
-        return self.wide.t
-
     def _geo(self):
         s = self.strip
         return SB.hbar_geometry(self.lh, 0.0, self.lw, self.wide.t, s.view_w(), s.content_w(), s.scroll,
                                 self.REST_GAP, self.WIDE_GAP)
 
-    def _thumb(self):
-        g = self._geo()
-        return (g["thumb"][0], g["thumb"][2]) if g else None
-
-    def thumb_rect(self):
-        g = self._geo()
-        return g["thumb"] if g else None
-
-    def arrows_shown(self) -> bool:
-        g = self._geo()
-        return bool(g and g["arrows"])
-
     # mouse ---------------------------------------------------------------------
-    def _on_enter(self, e=None):
-        super()._on_enter(e)
-        if self._geo() is not None:
-            self.wide.expand()
-
     def _on_leave(self, e=None):
         self.hover = False
         self.pressed = False

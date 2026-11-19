@@ -189,9 +189,6 @@ class Toggle(Control):
             return 40
         return max(text_width(self.label_fn(True), 14), text_width(self.label_fn(False), 14)) + 12 + 40
 
-    def label_width(self) -> float:
-        return text_width(self.label_fn(self.value), 14)
-
     def _flip(self):
         self.value = not self.value
         self.redraw()
@@ -701,10 +698,6 @@ class Segmented(Control):
         self.hover_i = -1
         self.bind("<Motion>", self._motion)
         self.command = None
-
-    def set_labels(self, labels):
-        self.labels = list(labels)
-        self.redraw()
 
     def set_index(self, i):
         if i != self.index:

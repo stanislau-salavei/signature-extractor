@@ -150,7 +150,7 @@ class SettingsManager:
     def __init__(self, argv: Optional[List[str]] = None):
         self.path = get_app_data_dir() / "settings.json"
         self.data: Dict[str, Any] = copy.deepcopy(DEFAULT_SETTINGS)
-        self.first_run = False
+        self.first_run = False          # test hook (remark 108): no settings.json before this start
         self._load(list(argv) if argv is not None else sys.argv[1:])
 
     def _load(self, argv: List[str]) -> None:

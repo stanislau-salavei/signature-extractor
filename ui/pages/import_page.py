@@ -23,7 +23,6 @@ class DropZone(Box):
                                tooltip=lambda: app.t("menu.open_file.tooltip"))
         self.batch_btn = Button(self, app.t("import.batch_folder"), kind="secondary", icon="folder_batch",
                                 size="lg", bg="drop", command=app.open_folder_dialog)
-        self._spin_job = None
 
     def set_mode(self, mode):
         if mode != self.mode:
@@ -35,12 +34,11 @@ class DropZone(Box):
 
     def _tick(self):
         if self.mode != "busy" or not self.winfo_exists():
-            self._spin_job = None
             return
         self.angle = (self.angle + 12) % 360
         self.delete("spin")
         self._draw_spinner()
-        self._spin_job = self.after(30, self._tick)
+        self.after(30, self._tick)
 
     def _place_buttons(self):
         if self.mode == "busy" or self.lw <= 0:

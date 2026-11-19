@@ -73,7 +73,6 @@ class App:
     saving = _state("saving", "a batch is being written (17): navigation is locked")
     settings_open = _state("settings_open")
     help_open = _state("help_open", "remark 30: «Справка» page from the ⋯ menu")
-    pending_skipped = _state("pending_skipped")
     _recent = _state("recent", "batch photos kept loaded (current + recent)")
     _load_error_shown = _state("load_error_shown")
     _pending_params = _state("pending_params")
@@ -94,7 +93,6 @@ class App:
         Fonts.init(self.root)
         self.worker = BackgroundWorker()
         self._last_size = (0, 0)
-        self._sys_dark = None
 
         self._apply_theme(initial=True)
         self.root.title(self.t("app.name"))
@@ -777,7 +775,6 @@ class App:
         # remark 74: «no signature» is the yellow card under the image (process_page.layout), not dialog 30
 
     def _load_failed(self, exc):
-        self.pending_skipped = None
         self.go_home()
         name = exc.args[0] if isinstance(exc, P.ImageLoadError) and exc.args else "?"
         self.show_error_dialog(self.t("errors.open.title"), self.t("errors.open.body", file=name), width=460)

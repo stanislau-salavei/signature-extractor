@@ -1067,13 +1067,6 @@ class ExportPage(Box):
         self.c_color.rebuild()
         self.changed()
 
-    def delete_color(self, key):
-        self.settings.delete_custom_color(key)          # stage 5: the same action as in Settings
-        if self.color_key == key:
-            self.color_key = ex.DEFAULT_COLOR_KEY
-        self.c_color.rebuild()
-        self.changed()
-
     def add_color(self):
         from ui.dialogs.color_dialog import CustomColorDialog
 

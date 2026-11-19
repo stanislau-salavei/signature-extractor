@@ -54,7 +54,6 @@ class SCard(Box):
         self.expandable, self.is_open, self.body_h_fn, self.logo = expandable, open_, body_h, logo
         self.extra_h_fn = extra_h   # always-visible rows under the header (not an expander)
         self.hover = False
-        self.right_w = 0.0  # width of child controls on the right of the header row
         self.extra_draw: Optional[Callable[["SCard"], None]] = None  # page-owned items, redrawn with the card
         if expandable:
             self.bind("<Enter>", lambda e: self._hov(e))
@@ -369,7 +368,7 @@ class SettingsPage(Box):
             items += [MenuItem(t("common.edit"), lambda: self._edit_size(sz)), None,
                       MenuItem(t("common.delete"), lambda: self._delete_size(sz))]
         x, y, w, h = widget_rect(self.app.root, self.size_more[i])
-        self.size_menu = MenuPopup(self.app, items, x - 4, y + h - 2, align_right=True, min_width=160)
+        MenuPopup(self.app, items, x - 4, y + h - 2, align_right=True, min_width=160)
 
     def _add_size(self):
         from ui.dialogs.sizes import SizeDialog
@@ -396,7 +395,7 @@ class SettingsPage(Box):
             menu += [MenuItem(t("common.edit"), lambda: self._edit_color(key)), None,
                      MenuItem(t("common.delete"), lambda: self._delete_color(key))]
         x, y, w, h = widget_rect(self.app.root, self.color_more[i])
-        self.color_menu = MenuPopup(self.app, menu, x - 4, y + h - 2, align_right=True, min_width=160)
+        MenuPopup(self.app, menu, x - 4, y + h - 2, align_right=True, min_width=160)
 
     def _set_color_key(self, key):
         from ui.dialogs.colors import set_default_color
@@ -477,11 +476,6 @@ class SettingsPage(Box):
     def hide(self):
         super().hide()
         self.area.hide()
-
-    def reveal_about(self):
-        self.c_about.is_open = True
-        self.layout_content()
-        self.area.scroll_to(self.area.content_h)
 
     def sync(self):
         s, t = self.app.settings, self.app.t
@@ -655,7 +649,6 @@ class SettingsPage(Box):
                     link.geom(63, y, link.natural_width(), 40)
                     y += 42
                 lab_w = text_width(self.app.t("settings.license"), 12.5)
-                self.about_body.lic_y = y - top
                 self.about_body.redraw()
                 self.license_link.geom(63 + lab_w + 5.4, y, self.license_link.natural_width(), 40)
                 self._lic_y = y
@@ -758,7 +751,6 @@ class _AboutText(Box):
     def __init__(self, master, app):
         super().__init__(master, bg="card")
         self.app = app
-        self.lic_y = 0
 
     def draw(self):
         self.text(0, 18, "© 2026 Stanislau Salavei", 12.5, color="muted")
@@ -773,12 +765,3 @@ def _margin_allowed(text: str) -> bool:
     return re.fullmatch(r"\d{0,2}([.,]\d?)?", text) is not None
 
 
-def _ver(v: str):
-    out = []
-    for p in v.split("."):
-        try:
-            out.append(int(re.sub(r"\D.*", "", p) or 0))
-        except ValueError:
-            log.debug("_ver: ValueError caught", exc_info=True)   # remark 81
-            out.append(0)
-    return tuple(out)

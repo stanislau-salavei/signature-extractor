@@ -43,7 +43,6 @@ class UpdateController:
         self.pending = None           # Release waiting for screen 1 (silent check)
         self.dialog = None
         self._cancel: Optional[threading.Event] = None
-        self.last_result: Optional[U.CheckResult] = None
 
     # ------------------------------------------------------------------ threads → Tk
     def _run(self, fn, done):
@@ -94,7 +93,6 @@ class UpdateController:
 
     def _checked(self, res: U.CheckResult, manual: bool):
         self.checking = False
-        self.last_result = res
         app = self.app
         if res.status != "offline":
             app.settings.set("last_update_check", U.now_iso())

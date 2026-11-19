@@ -178,10 +178,6 @@ def S(v: float) -> int:
     return int(round(v * Scale.factor))
 
 
-def Sf(v: float) -> float:
-    return v * Scale.factor
-
-
 # --------------------------------------------------------------------------- fonts
 class Fonts:
     regular_family = "Segoe UI"

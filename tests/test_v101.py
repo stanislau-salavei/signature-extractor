@@ -70,3 +70,55 @@ def test_d7_pytest_not_a_runtime_requirement():
 def test_r105_smoke_checks_png_and_jpeg():
     src = (ROOT / "ui" / "smoke.py").read_text(encoding="utf-8")
     assert 'out["png_jpeg"]' in src and 'isinstance(out["png_jpeg"], list)' in src
+
+
+# ================================================================== 106–109, 111, A14: dead code
+def test_r106_unused_core_functions_removed():
+    from core import batch as B, processing as P
+    assert not hasattr(P, "detect_ink") and not hasattr(P, "_chroma") and hasattr(P, "detect_ink_ex")
+    assert not hasattr(B.Batch, "no_dpi_items")
+    assert "Test hook" in P.load_image_bytes.__doc__
+
+
+def test_r107_unused_ui_members_removed():
+    from ui import theme, updates
+    from ui.pages import export_page, settings_page
+    from ui.widgets import controls
+    assert not hasattr(export_page.ExportPage, "delete_color")
+    assert not hasattr(settings_page.SettingsPage, "reveal_about") and not hasattr(settings_page, "_ver")
+    assert not hasattr(theme, "Sf") and not hasattr(controls.Toggle, "label_width")
+    for mod, names in ((settings_page, ("lic_y", "right_w", "size_menu", "color_menu")), (updates, ("last_result",))):
+        src = Path(mod.__file__).read_text(encoding="utf-8")
+        assert not any(re.search(rf"\.{n}\b", src) for n in names), mod
+    for f, n in (("ui/app.py", "_sys_dark"), ("ui/pages/import_page.py", "_spin_job"),
+                 ("ui/widgets/controls.py", "def set_labels")):
+        assert n not in (ROOT / f).read_text(encoding="utf-8"), f
+
+
+def test_r108_test_hooks_marked():
+    from core import batch as B
+    from ui.dialogs import formats_help
+    from ui.widgets import scroll
+    assert "Test hook" in B.SaveSession.finished.__doc__
+    assert "Test hook" in formats_help.card_titles.__doc__
+    assert "Test hook" in scroll.BarMixin.thumb_rect.__doc__ and "Test hook" in scroll.BarMixin.arrows_shown.__doc__
+    assert "test hook (remark 108)" in (ROOT / "core" / "settings.py").read_text(encoding="utf-8")
+
+
+def test_r109_no_pending_skipped():
+    for f in ("core/state.py", "ui/app.py"):
+        assert "pending_skipped" not in (ROOT / f).read_text(encoding="utf-8")
+
+
+def test_r111_unused_icons_removed():
+    icons = ROOT / "assets" / "icons"
+    for n in ("chev_down_combo", "gpu", "hc_ai", "info_filled", "minimize", "sparkle"):
+        assert not (icons / f"{n}.png").exists(), n
+    assert list(icons.glob("help_*.png"))
+
+
+def test_a14_one_scrollbar_mixin():
+    from ui.widgets import batch, scroll
+    assert issubclass(scroll.ScrollBar, scroll.BarMixin) and issubclass(batch._HBar, scroll.BarMixin)
+    for cls in (scroll.ScrollBar, batch._HBar):
+        assert "thumb_rect" not in cls.__dict__ and "_thumb" not in cls.__dict__

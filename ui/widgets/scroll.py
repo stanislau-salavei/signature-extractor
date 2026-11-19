@@ -173,7 +173,31 @@ class Widening:
         self._cancel("_delay")
 
 
-class ScrollBar(Control):
+class BarMixin:
+    """Remark 118 (audit A14): what the vertical bar of ScrollArea and the horizontal bar of the photo strip
+    (ui/widgets/batch.py) have in common.  The class provides ``_geo()`` (None = nothing to scroll) and ``wide``."""
+
+    @property
+    def t(self) -> float:
+        return self.wide.t
+
+    def thumb_rect(self):
+        """Test hook: (x, y, w, h) of the thumb in logical px."""
+        g = self._geo()
+        return g["thumb"] if g else None
+
+    def arrows_shown(self) -> bool:
+        """Test hook: the arrow buttons are drawn."""
+        g = self._geo()
+        return bool(g and g["arrows"])
+
+    def _on_enter(self, e=None):
+        super()._on_enter(e)
+        if self._geo() is not None:
+            self.wide.expand()
+
+
+class ScrollBar(BarMixin, Control):
     """Overlay bar of a ScrollArea (Параметры, справка, экран 2, экран 3, окно 21): drag the thumb, click the
     track to page, the arrows step (and repeat while held), the wheel works over the whole page."""
     W = ZONE_W
@@ -186,33 +210,11 @@ class ScrollBar(Control):
         self.wide = Widening(self, self.redraw, lambda: self.hover or self._drag_y is not None)
         self.bind("<B1-Motion>", self._drag)
 
-    @property
-    def t(self) -> float:
-        return self.wide.t
-
     def _geo(self):
         a = self.area
         return bar_geometry(self.lw, 0.0, self.lh, self.wide.t, a.view_h, a.content_h, a.scroll)
 
-    def _thumb(self):
-        g = self._geo()
-        return (g["thumb"][1], g["thumb"][3]) if g else None
-
-    def thumb_rect(self):
-        """(x, y, w, h) of the thumb in logical px (tests)."""
-        g = self._geo()
-        return g["thumb"] if g else None
-
-    def arrows_shown(self) -> bool:
-        g = self._geo()
-        return bool(g and g["arrows"])
-
     # mouse ---------------------------------------------------------------------
-    def _on_enter(self, e=None):
-        super()._on_enter(e)
-        if self._geo() is not None:
-            self.wide.expand()
-
     def _on_leave(self, e=None):
         self.hover = False
         self.pressed = False

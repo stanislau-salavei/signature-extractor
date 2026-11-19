@@ -21,7 +21,6 @@ class AppState:
         self.recent: List[Any] = []     # batch photos kept loaded (current + recent)
         self.loaded_max = loaded_max
         self.load_error_shown = False   # dialog 29 is shown once per batch
-        self.pending_skipped = None
         self.pending_params = None      # params of the single photo being loaded
         self.saved_token = None         # remark 39: work snapshot of the last successful save
 

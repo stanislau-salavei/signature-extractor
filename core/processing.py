@@ -195,6 +195,7 @@ def load_image(path: Path) -> Tuple[Image.Image, Optional[float]]:
 
 
 def load_image_bytes(data: bytes) -> Tuple[Image.Image, Optional[float]]:
+    """Test hook (remark 106): used only by tests/test_remarks7.py; the clipboard is read with ImageGrab."""
     try:
         pil = Image.open(io.BytesIO(data))
         pil.load()
@@ -310,21 +311,9 @@ def _soft_alpha(dark: np.ndarray, sensitivity: int) -> np.ndarray:
     return np.clip(a, 0.0, 1.0)
 
 
-def _chroma(lab: np.ndarray) -> np.ndarray:
-    a = lab[..., 1].astype(np.float32) - 128.0
-    b = lab[..., 2].astype(np.float32) - 128.0
-    return np.sqrt(a * a + b * b)
-
-
-def detect_ink(photo: Photo, core_mask: np.ndarray) -> Tuple[Optional[Tuple[int, int, int]], bool]:
-    """Auto ink colour: (rgb or None, separated?).  See detect_ink_ex."""
-    rgb, separated, _stamp = detect_ink_ex(photo, core_mask)
-    return rgb, separated
-
-
 def detect_ink_ex(photo: Photo, core_mask: np.ndarray) -> Tuple[Optional[Tuple[int, int, int]], bool, bool]:
-    """Like detect_ink, plus «the coloured group looked like a stamp» (remark 63: a clearly darker group of
-    another colour was taken as the ink instead)."""
+    """Auto ink colour: (rgb or None, separated?, «the coloured group looked like a stamp») — remark 63: a clearly
+    darker group of another colour was taken as the ink instead."""
     rgb, separated = _detect_ink_raw(photo, core_mask)
     if rgb is None or not separated:
         return rgb, separated, False

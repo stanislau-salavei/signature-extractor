@@ -302,9 +302,6 @@ class Batch:
             self.saved = False
         return changed
 
-    def no_dpi_items(self) -> List[Job]:
-        return [j for j in self.items if j.processed and not j.has_dpi]
-
 
 def summary_text(i18n, photos: int, formats: int, files: int) -> str:
     """«50 фото × 2 формата = 100 файлов» — three plural forms in one row (batch.summary)."""
@@ -411,6 +408,7 @@ class SaveSession:
 
     @property
     def finished(self) -> bool:
+        """Test hook (remark 108): every file of the session is written."""
         return self.done >= self.total
 
 
