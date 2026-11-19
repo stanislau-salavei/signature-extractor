@@ -1,0 +1,3 @@
+# Signature Extractor — tests (remark 118 / audit D7: pytest is not a runtime dependency)
+-r requirements.txt
+pytest>=7.0

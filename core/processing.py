@@ -1,7 +1,7 @@
 """Signature extraction core (stage 2). No UI imports.
 
 Pipeline (per photo):
-  1. load (OpenCV for JPG/PNG/BMP/TIFF/WebP, pillow-heif for HEIC/HEIF), EXIF orientation;
+  1. load (OpenCV for JPG/PNG/BMP/TIFF/WebP, pi-heif for HEIC/HEIF), EXIF orientation;
   2. working copy limited to WORK_MAX_SIDE px (physical size is kept through the DPI factor);
   3. «Выравнивание фона»: divide by a blurred background estimate (removes shadows, uneven light, yellow paper);
   4. ink darkness -> soft alpha (anti-aliased edges), threshold from «Чувствительность»;
@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover - cv2 is a hard requirement of the app
     cv2 = None
 
 try:
-    from pillow_heif import register_heif_opener
+    from pi_heif import register_heif_opener      # remark 99: decode-only build of pillow-heif (no x265 encoder)
 
     register_heif_opener()
     HAS_HEIF = True

@@ -5,6 +5,7 @@ report (version, frozen, drag and drop, HEIC, OpenCV, files of the onedir build)
 without saving its size.  Without the variable nothing happens."""
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -14,6 +15,15 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 ENV = "SE_SMOKE_REPORT"
+# 64×48 near-white HEIC (440 bytes), made once with pillow-heif: the build has a decoder only (remark 99)
+SMOKE_HEIC = (
+    "AAAAHGZ0eXBoZWljAAAAAG1pZjFoZWljbWlhZgAAAX1tZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAA"
+    "ACJpbG9jAAAAAERAAAEAAQAAAAABoQABAAAAAAAAABcAAAAjaWluZgAAAAAAAQAAABVpbmZlAgAAAAABAABodmMxAAAAAA5waXRt"
+    "AAAAAAABAAAA/WlwcnAAAADdaXBjbwAAAHZodmNDAQNwAAAAkAAAAAAAHvAA/P34+AAADwNgAAEAGEABDAH//wNwAAADAJAAAAMA"
+    "AAMAHroCQGEAAQAqQgEBA3AAAAMAkAAAAwAAAwAeoCCBBZbq5Ka5uAhoMCAAAAMDIAAAAwAhYgABAAZEAcFzwIkAAAATY29scm5j"
+    "bHgAAQANAAaAAAAAFGlzcGUAAAAAAAAAQAAAAEAAAAAoY2xhcAAAAEAAAAABAAAAMAAAAAEAAAAAAAAAAv////AAAAACAAAAEHBp"
+    "eGkAAAAAAwgICAAAABhpcG1hAAAAAAAAAAEAAQWBAgMFhAAAAB9tZGF0AAAAEygBrxOA+FDQp9Q/b+4MZilTV4A="
+)
 
 
 def report(app) -> dict:
@@ -29,16 +39,28 @@ def report(app) -> dict:
         log.error("smoke: opencv failed", exc_info=True)
         out["opencv"] = f"error: {exc}"
     try:
-        from PIL import Image
         from core import processing as P
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "smoke.heic"
-            Image.new("RGB", (64, 48), (250, 250, 250)).save(p)
-            img, _dpi = P.load_image(p)                # pillow-heif writes and reads HEIC
+            p.write_bytes(base64.b64decode(SMOKE_HEIC))   # remark 99: pi-heif only decodes
+            img, _dpi = P.load_image(p)
             out["heic"] = list(img.size)
     except Exception as exc:
         log.error("smoke: heic failed", exc_info=True)
         out["heic"] = f"error: {exc}"
+    try:                                               # remark 105: PNG and JPEG still open without AVIF
+        from PIL import Image
+        from core import processing as P
+        sizes = []
+        with tempfile.TemporaryDirectory() as d:
+            for ext in ("png", "jpg"):
+                p = Path(d) / f"smoke.{ext}"
+                Image.new("RGB", (40, 30), (240, 240, 240)).save(p)
+                sizes.append(list(P.load_image(p)[0].size))
+        out["png_jpeg"] = sizes
+    except Exception as exc:
+        log.error("smoke: png / jpeg failed", exc_info=True)
+        out["png_jpeg"] = f"error: {exc}"
     try:
         from PIL import Image, ImageTk
         ph = ImageTk.PhotoImage(Image.new("RGBA", (8, 8), (0, 0, 0, 255)), master=app.root)
@@ -55,7 +77,7 @@ def report(app) -> dict:
         out["ezdxf"] = f"error: {exc}"
     out["log_errors"] = _log_errors()
     out["ok"] = bool(out["log_errors"] == 0 and isinstance(out["imagetk"], list) and out["assets"] and out["i18n"] and out["dnd"] and isinstance(out["heic"], list)
-                     and not str(out["opencv"]).startswith("error") and not str(out["ezdxf"]).startswith("error"))
+                     and isinstance(out["png_jpeg"], list) and not str(out["opencv"]).startswith("error") and not str(out["ezdxf"]).startswith("error"))
     return out
 
 

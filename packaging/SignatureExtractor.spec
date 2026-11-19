@@ -16,17 +16,19 @@ datas = [
     (str(ROOT / "LICENSE"), "."),                # GNU GPLv3 next to the program files as well
 ]
 datas += collect_data_files("customtkinter")     # themes (json) and fonts of CustomTkinter
-datas += collect_data_files("ezdxf", excludes=["**/tests/**"])
-# tkinterdnd2 brings its own PyInstaller hook (tkdnd DLL for the platform); pillow_heif — extension + libheif
+# remark 104: no C/Cython sources and type stubs of ezdxf (≈ 8.8 MB), only its resources
+datas += collect_data_files("ezdxf", excludes=["**/tests/**", "**/*.c", "**/*.pyx", "**/*.pxd", "**/*.pyi", "**/*.h"])
+# tkinterdnd2 brings its own PyInstaller hook (tkdnd DLL for the platform); pi_heif — extension + libheif (decoder only, remark 99)
 
-hiddenimports = collect_submodules("pillow_heif") + ["tkinterdnd2", "darkdetect", "potrace",
+hiddenimports = collect_submodules("pi_heif") + ["tkinterdnd2", "darkdetect", "potrace",
                                                      "PIL.ImageTk", "PIL._tkinter_finder"]   # PhotoImage
 
 excludes = [
     "pytest", "_pytest", "pluggy", "tests",
     "tkinter.test", "idlelib", "lib2to3", "pydoc_data",
     "matplotlib", "scipy", "pandas", "IPython", "PyQt5", "PySide2", "PySide6", "PyQt6",
-    "onnxruntime", "torch",                       # no AI model in v1.0 (remark 78)
+    "onnxruntime", "torch",                       # large optional libraries, never bundled
+    "PIL.AvifImagePlugin", "PIL._avif",           # remark 105: AVIF is not a supported format (≈ 7.9 MB)
 ]
 
 a = Analysis(
@@ -41,6 +43,9 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# remark 98: the cv2 hook adds the video-input DLL (opencv_videoio_ffmpeg*.dll, ≈ 41 MB); the program reads
+# no video (imdecode / imencode do not use it)
+a.binaries = [b for b in a.binaries if "opencv_videoio_ffmpeg" not in b[0].lower()]
 pyz = PYZ(a.pure)
 
 exe = EXE(

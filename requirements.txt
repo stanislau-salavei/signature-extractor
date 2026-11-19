@@ -1,13 +1,11 @@
-# Signature Extractor v1.0 (GPLv3) — runtime
+# Signature Extractor (GPLv3) — runtime; tests: requirements-dev.txt; exact build versions: packaging/constraints-win.txt
 customtkinter>=5.2.2
 tkinterdnd2>=0.4.2       # drag and drop of files / folders (02)
 darkdetect>=0.8.0        # system theme on non-Windows (Windows reads the registry directly)
 Pillow>=10.0.0
 numpy>=1.26.0
 opencv-python-headless>=4.8.0
-pillow-heif>=0.13.0      # HEIC / HEIF
+pi-heif>=1.0.0          # HEIC / HEIF, decode only (remark 99; BSD-3-Clause, libheif LGPL)
 # Stage 3 export
 potracer>=0.0.4          # SVG/DXF tracing (GPL, compatible with GPLv3)
 ezdxf>=1.1.0             # DXF R2010 writer (MIT)
-# Tests
-pytest>=7.0
