@@ -17,8 +17,8 @@ from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
-PROMPT_CSV = Path("/workspace/prompt/v2/i18n/strings_ru_en.csv")
-R48 = Path("/workspace/rewrite/r48_try")
+from tests.i18n_prompt_diff import PROMPT_CSV  # noqa: E402  (remark 91: copy in docs/prompt_v2)
+from tests.i18n_prompt_diff import R48  # noqa: E402  (local photos; tests skip without them)
 PAPER = (239, 236, 227)
 BLUE = (30, 45, 140)
 DARK = (38, 32, 34)
@@ -208,7 +208,7 @@ def test_r62_reasons_one_per_line():
 # ------------------------------------------------------------------ i18n, help
 def test_r59_71_i18n_rows_and_csv_identity():
     r = rows()
-    assert len(r) == 346          # remark 78 removed 10 rows (tests/i18n_prompt_diff.py)
+    assert len(r) == 345          # remark 78 removed 10 rows, remark 90 one (tests/i18n_prompt_diff.py)
     assert_matches_prompt(CSV, PROMPT_CSV)     # remarks 77–85: approved differences only
     exp = {
         "batch.doubt.pale": ("Подпись бледная — проверьте, все ли штрихи на месте", "The signature is faint — check that all strokes are there"),

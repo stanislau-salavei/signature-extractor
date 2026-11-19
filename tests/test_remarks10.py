@@ -119,8 +119,8 @@ def test_r84_release_is_v1_0():
     from core import updater as U
     assert A.VERSION == "1.0" and A.RELEASE_TAG == "v1.0" and SP.RELEASE_TAG == A.RELEASE_TAG
     assert not U.is_newer("v1.0", "1.0") and U.is_newer("v1.1", "1.0") and U.is_newer("v1.0.1", "1.0")
-    notes = (ROOT.parent / "NOTES.md")
-    if notes.exists():
+    notes = next((p for p in (ROOT / "NOTES.md", ROOT.parent / "NOTES.md") if p.exists()), None)   # repo / local
+    if notes is not None:
         assert "тег `v1.0`" in notes.read_text(encoding="utf-8")
 
 

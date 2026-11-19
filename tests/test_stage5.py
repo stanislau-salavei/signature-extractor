@@ -19,7 +19,7 @@ from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
-PROMPT_CSV = Path("/workspace/prompt/v2/i18n/strings_ru_en.csv")
+from tests.i18n_prompt_diff import PROMPT_CSV  # noqa: E402  (remark 91: copy in docs/prompt_v2)
 
 
 def rows():

@@ -23,8 +23,8 @@ from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
-PROMPT_CSV = Path("/workspace/prompt/v2/i18n/strings_ru_en.csv")
-R48 = Path("/workspace/rewrite/r48_try")
+from tests.i18n_prompt_diff import PROMPT_CSV  # noqa: E402  (remark 91: copy in docs/prompt_v2)
+from tests.i18n_prompt_diff import R48  # noqa: E402  (local photos; tests skip without them)
 
 
 def rows():

@@ -17,7 +17,8 @@ from tests.test_remarks8 import app, pump, close_all      # noqa: F401  (shared 
 
 PAPER = (246, 245, 241)
 BLUE = (30, 45, 140)
-ZIP4 = Path("/workspace/rewrite/r48_try/zip4")
+from tests.i18n_prompt_diff import R48  # noqa: E402  (local photos; tests skip without them)
+ZIP4 = R48 / "zip4"
 PPM = 300 / 25.4
 
 

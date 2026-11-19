@@ -32,7 +32,7 @@ def ru_plural_text(base: str, note: str, n: int) -> str:
     if not target:
         return base
     if ref is None:
-        # only a full «one» sentence is given (batch.attention_hint: «Поправьте его…»)
+        # only a full «one» sentence is given (e.g. «Поправьте его…», the former batch.attention_hint)
         return target if (cat == "one" and set(forms) == {"one"}) else base
     idx = base.index(ref)
     prefix = base[:idx]

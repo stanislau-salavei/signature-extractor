@@ -49,7 +49,7 @@ def test_vector_tag_badge():
 
 
 def test_project_csv_matches_prompt_csv():
-    prompt = Path("/workspace/prompt/v2/i18n/strings_ru_en.csv")
+    from tests.i18n_prompt_diff import PROMPT_CSV as prompt   # remark 91: docs/prompt_v2 in the repository
     if not prompt.exists():
         pytest.skip("prompt table not available")
     assert_matches_prompt(CSV, prompt)         # remarks 77–85: approved differences only

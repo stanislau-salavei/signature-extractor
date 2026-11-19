@@ -144,8 +144,8 @@ def test_r89_batch_doubt_and_not_found_reason_inside(app, mixed):
     assert app.job.status == "attention"
     assert wb.lines() == [app.t("batch.reason_not_found")]                  # no reason bar above the preview (40)
     assert pp.preview.ly == 52.0
-    _select(app, "photo_1.png")                                             # a fine photo: the export hint
-    assert wb.lines() == [app.tn("batch.attention_hint", 2)]
+    _select(app, "photo_1.png")                                             # a fine photo: remark 90 — title only
+    assert wb.lines() == [] and wb.height() == 48.0
 
 
 def test_r89_help_text_says_inside():

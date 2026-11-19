@@ -170,8 +170,7 @@ def test_summary_plural_forms(ru, en):
 def test_batch_plural_rows(ru, en):
     assert ru.tn("batch.attention_bar", 2) == "2 файла требуют внимания"
     assert ru.tn("batch.attention_bar", 1) == "1 файл требует внимания"
-    assert ru.tn("batch.attention_hint", 1).startswith("Поправьте его")
-    assert ru.tn("batch.attention_hint", 2).startswith("Поправьте их")
+    # remark 90: batch.attention_hint («Поправьте их…») removed
     assert ru.tn("batch.saving", 100, done=46, total=100) == "Сохранено 46 из 100 файлов"
     assert ru.tn("batch.saving", 2, done=1, total=2) == "Сохранено 1 из 2 файлов"
     assert ru.tn("batch.skipped_large_title", 3) == "Пропущено 3 файла"

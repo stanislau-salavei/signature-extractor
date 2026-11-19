@@ -601,11 +601,9 @@ class ProcessPage(Box):
             state = b.bar_state()
             if state == "warn":
                 n = len(b.attention())
-                # remark 48: «Поправьте их или уберите из пакета, чтобы перейти к экспорту» while a photo without a
-                # signature blocks export; remark 89: the selected photo's reason replaces it when there is one
-                nb = len(b.blocking())
-                msg = reason or (tn("batch.attention_hint", 1 if n == 1 else 2) if nb else "")
-                self.warn_bar.set(tn("batch.attention_bar", n), msg, action=t("common.show"))
+                # remark 89: the selected photo's reason is the second line; remark 90: without a reason of its
+                # own there is no second line (no «Поправьте их или уберите из пакета…»)
+                self.warn_bar.set(tn("batch.attention_bar", n), reason, action=t("common.show"))
                 bars.append(self.warn_bar)
             else:
                 self.warn_bar.hide()

@@ -16,7 +16,7 @@ from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
-PROMPT_CSV = Path("/workspace/prompt/v2/i18n/strings_ru_en.csv")
+from tests.i18n_prompt_diff import PROMPT_CSV  # noqa: E402  (remark 91: copy in docs/prompt_v2)
 
 
 def rows():
@@ -24,8 +24,11 @@ def rows():
 
 
 # ------------------------------------------------------------------ 40: DXF / SVG trace resolution
-SAMPLE3 = ROOT / "tests" / "data" / "sample3.png"   # real signature, kept locally, not in the repo
-needs_sample3 = pytest.mark.skipif(not SAMPLE3.exists(), reason="local test photo not on this machine")
+# real signature (photo 3), kept locally, not in the repo (remark 91: skip without it)
+from tests.i18n_prompt_diff import PRIVATE  # noqa: E402
+SAMPLE3 = next((p for p in (ROOT / "tests" / "data" / "sample3.png", PRIVATE / "sample3.png") if p.exists()),
+               ROOT / "tests" / "data" / "sample3.png")
+needs_sample3 = pytest.mark.skipif(not SAMPLE3.exists(), reason="local test photo (photo 3) not on this machine")
 
 
 def _sample3_source():

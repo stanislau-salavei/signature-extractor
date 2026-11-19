@@ -1,12 +1,22 @@
-"""Approved differences between the project table and /workspace/prompt/v2/i18n/strings_ru_en.csv.
+"""Approved differences between the project table and the prompt table (docs/prompt_v2/i18n/strings_ru_en.csv,
+a copy of /workspace/prompt/v2 — remark 91).
 
 Since remarks 77–85 (2026-11-19) the prompt table is no longer edited: the project CSV keeps every other row
-exactly as in the prompt copy, and only these rows differ (listed in NOTES.md, «Замечания 77–85» and «Замечания 86–89»)."""
+exactly as in the prompt copy, and only these rows differ (listed in NOTES.md, «Замечания 77–85», «86–89», «90–91»)."""
 import csv
 import io
+import os
 from pathlib import Path
 
-PROMPT_CSV = Path("/workspace/prompt/v2/i18n/strings_ru_en.csv")
+ROOT = Path(__file__).resolve().parents[1]
+# remark 91: the prompt copy in the repository first, the author's local copy as a fallback
+# (SE_PROMPT_FALLBACK / SE_R48_DIR / SE_PRIVATE_DIR point elsewhere, e.g. to check a clone without private data)
+PROMPT_DIR = next((d for d in (ROOT / "docs" / "prompt_v2", Path(os.environ.get("SE_PROMPT_FALLBACK", "/workspace/prompt/v2")))
+                   if d.exists()), ROOT / "docs" / "prompt_v2")
+PROMPT_CSV = PROMPT_DIR / "i18n" / "strings_ru_en.csv"
+# remark 91: real photos stay on the author's machine; the tests that need them skip without them
+R48 = Path(os.environ.get("SE_R48_DIR", "/workspace/rewrite/r48_try"))
+PRIVATE = Path(os.environ.get("SE_PRIVATE_DIR", "/workspace/private_test_data"))
 
 # text changed: 78 (no AI), 77 (one photo — the bar under the image), 85 (no final period),
 # 88 (no graphics card / DirectX 12 in the issue form), 89 (the reason inside the yellow card)
@@ -21,6 +31,7 @@ REMOVED = {
     "process.ai", "process.ai_desc", "settings.ai_default", "settings.ai_default.desc", "settings.gpu",
     "settings.gpu.desc", "settings.gpu.unsupported", "help.process.ai", "errors.no_signature.title",
     "errors.no_signature.body",
+    "batch.attention_hint",          # remark 90: no second line «Поправьте их…» in the batch card
 }
 
 
