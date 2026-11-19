@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Callable, List
 
 from ui import gfx
-from ui.theme import Scale, Theme, text_width
+from ui.theme import HEADER_H, Scale, Theme, text_width
 from ui.widgets.base import Box, Control
 from ui.widgets.controls import IconButton
 
@@ -103,7 +103,7 @@ class Header(Box):
                                tooltip=lambda: app.t("shell.more"))
 
     def layout(self, w):
-        self.geom(0, 0, w, 64)
+        self.geom(0, 0, w, HEADER_H)
         sw = self.stepper.natural_width()
         area_l, area_r = 24, w - 24 - 36 - 16
         x = area_l + (area_r - area_l - sw) / 2

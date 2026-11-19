@@ -45,7 +45,7 @@ def heif_available() -> bool:
             register_heif_opener()
             _HEIF = True
         except Exception:  # pragma: no cover
-            log.debug("pi_heif: Exception caught", exc_info=True)   # remark 81
+            log.warning("pi_heif: Exception caught", exc_info=True)   # remark 81, 115
             _HEIF = False
     return _HEIF
 
@@ -384,6 +384,15 @@ DARKER_HUE_GAP = 40.0      # … and of another hue (or grey) …
 DARKER_SHARE = 0.3         # … and holds ≥ 0.3 of the ink-coloured strokes → it is the signature
 DARKER_PERCENTILE = 5.0    # its darkest 5 % give the ink colour (like the eyedropper)
 BLUE_MAX_L = 48.0          # remark 64: blue / violet is preferred only when it is dark (stamps: L* 56–58)
+# remark 113 (audit B4): thresholds of the auto ink colour (t21s, remarks 52, 55, 63)
+COLOR_CHROMA = 14.0        # a pixel with Lab chroma above this is coloured, below it is grey / black
+INK_CHROMA_MIN = 10.0      # an ink colour with chroma below this has no hue to compare (remarks 63, 65, 48)
+HUE_GATE_CHROMA = 12.0     # remarks 55 / 56: the hue gate works only for an ink at least this coloured
+MIN_INK_PX = 60            # fewer ink pixels than this (or coloured / blue ones) say nothing about the colour
+INK_SAMPLE_PX = 40000      # the colour is estimated on at most this many ink pixels (fixed seed)
+GREY_SHARE = 0.06          # less coloured ink than this share → grey-black ink
+BLUE_SHARE = 0.08          # remark 52: blue / violet wins when it is at least this share of the coloured ink
+KMEANS_MIN_PX = 50         # two colour groups are looked for only with more coloured pixels than this
 
 
 def _lab_l(rgb: Sequence[int]) -> float:
@@ -395,7 +404,7 @@ def _darker_other_group(photo: Photo, core_mask: np.ndarray, ink_rgb: Sequence[i
     group of strokes ≥ 20 L* darker and of another hue holds ≥ 0.3 of the ink-coloured strokes, the
     darkest 5 % of that group is the ink.  Returns the rgb or None."""
     hue_t, chroma_t = lab_hue_chroma(ink_rgb)
-    if chroma_t < 10.0:
+    if chroma_t < INK_CHROMA_MIN:
         return None
     t_l = _lab_l(ink_rgb)
     lab = photo.lab
@@ -404,10 +413,10 @@ def _darker_other_group(photo: Photo, core_mask: np.ndarray, ink_rgb: Sequence[i
     b = lab[..., 2].astype(np.float32)[core_mask] - 128.0
     ch = np.hypot(a, b)
     dh = np.abs((np.degrees(np.arctan2(b, a)) - hue_t + 180.0) % 360.0 - 180.0)
-    other = (L < t_l - DARKER_L_GAP) & ((ch < 14.0) | (dh > DARKER_HUE_GAP))
-    ink_like = (ch >= 14.0) & (dh <= DARKER_HUE_GAP)
+    other = (L < t_l - DARKER_L_GAP) & ((ch < COLOR_CHROMA) | (dh > DARKER_HUE_GAP))
+    ink_like = (ch >= COLOR_CHROMA) & (dh <= DARKER_HUE_GAP)
     n_other = int(other.sum())
-    if n_other < 60 or n_other < DARKER_SHARE * max(1, int(ink_like.sum())):
+    if n_other < MIN_INK_PX or n_other < DARKER_SHARE * max(1, int(ink_like.sum())):
         return None
     lo = L[other]
     sel = lo <= np.percentile(lo, DARKER_PERCENTILE)
@@ -420,17 +429,17 @@ def _detect_ink_raw(photo: Photo, core_mask: np.ndarray) -> Tuple[Optional[Tuple
     Returns (rgb of the coloured ink group or None, separated?).  ``separated`` is False when
     the signature colour can't be told apart from grey-black print."""
     idx = np.flatnonzero(core_mask)
-    if idx.size < 60:
+    if idx.size < MIN_INK_PX:
         return None, False
     rng = np.random.default_rng(1)
-    if idx.size > 40000:
-        idx = rng.choice(idx, 40000, replace=False)
+    if idx.size > INK_SAMPLE_PX:
+        idx = rng.choice(idx, INK_SAMPLE_PX, replace=False)
     lab = photo.lab.reshape(-1, 3)[idx].astype(np.float32)
     rgb = photo.rgb.reshape(-1, 3)[idx]
     chroma = np.sqrt((lab[:, 1] - 128) ** 2 + (lab[:, 2] - 128) ** 2)
-    colored = chroma > 14.0
+    colored = chroma > COLOR_CHROMA
     share = float(colored.mean())
-    if share < 0.06:  # practically everything is grey / black
+    if share < GREY_SHARE:  # practically everything is grey / black
         return tuple(int(v) for v in np.median(rgb, axis=0)), False
     # cluster the coloured pixels by hue (a, b) to find the dominant ink
     # remark 52: a stamp on the photo is usually the biggest coloured group — prefer blue / violet ink
@@ -438,12 +447,12 @@ def _detect_ink_raw(photo: Photo, core_mask: np.ndarray) -> Tuple[Optional[Tuple
     hue = np.degrees(np.arctan2(lab[:, 2] - 128, lab[:, 1] - 128))
     blue = colored & (hue >= BLUE_HUE[0]) & (hue < BLUE_HUE[1])
     nb = int(blue.sum())
-    if nb >= 60 and nb >= 0.08 * int(colored.sum()):
+    if nb >= MIN_INK_PX and nb >= BLUE_SHARE * int(colored.sum()):
         blue_rgb = tuple(int(v) for v in np.median(rgb[blue], axis=0))
         if _lab_l(blue_rgb) <= BLUE_MAX_L:      # remark 64: a light blue group is a stamp, not a pen
             return blue_rgb, True
     ab = lab[colored][:, 1:3]
-    k = 2 if ab.shape[0] > 50 else 1
+    k = 2 if ab.shape[0] > KMEANS_MIN_PX else 1
     if k == 2:
         crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.5)
         cv2.setRNGSeed(12345)      # remark 76: repeatable clustering
@@ -473,7 +482,7 @@ def _hue_gate(photo: Photo, target_rgb: Sequence[int]) -> Optional[np.ndarray]:
     ink hue — grey-black print (chroma ≈ 0) and red stamp lines (opposite hue) are dropped even when they
     are close in the plain Lab distance.  Chroma is measured along the ink hue, lightly smoothed."""
     _h, tc = lab_hue_chroma(target_rgb)
-    if tc < 12.0:
+    if tc < HUE_GATE_CHROMA:
         return None
     t = cv2.cvtColor(np.uint8([[list(target_rgb)]]), cv2.COLOR_RGB2LAB)[0, 0].astype(np.float32)
     ta, tb = (float(t[1]) - 128.0) / tc, (float(t[2]) - 128.0) / tc
@@ -611,7 +620,7 @@ def merge_by_cells(labels, group_mask, cells, n):
         uk, cnt = np.unique(key, return_counts=True)
         g_, c_ = uk // (int(cl.max()) + 1), uk % (int(cl.max()) + 1)
         best = {}
-        for g, c, k in zip(g_.tolist(), c_.tolist(), cnt.tolist()):     # first max wins, like argmax
+        for g, c, k in zip(g_.tolist(), c_.tolist(), cnt.tolist(), strict=True):     # first max wins, like argmax
             if g not in best or k > best[g][1]:
                 best[g] = (c, k)
         for i in range(1, n):
@@ -984,13 +993,13 @@ def assess_doubts(photo: Photo, dark: np.ndarray, mask: np.ndarray, frame: Tuple
     # (the colours were separated, but that is exactly where it can go wrong)
     if auto_ink is not None:
         hue, chroma = lab_hue_chroma(auto_ink)
-        if chroma >= 10.0 and STAMP_HUE[0] <= hue <= STAMP_HUE[1]:
+        if chroma >= INK_CHROMA_MIN and STAMP_HUE[0] <= hue <= STAMP_HUE[1]:
             out.append("stamp_ink")
     if "stamp_ink" not in out and core is not None:
         sub = photo.lab[fy:fy + fh, fx:fx + fw].astype(np.float32)
         a, b = sub[..., 1] - 128.0, sub[..., 2] - 128.0
         hue_px = np.degrees(np.arctan2(b, a))
-        red = core[fy:fy + fh, fx:fx + fw] & (np.hypot(a, b) >= 14.0) & (hue_px >= STAMP_HUE[0]) & (hue_px <= STAMP_HUE[1])
+        red = core[fy:fy + fh, fx:fx + fw] & (np.hypot(a, b) >= COLOR_CHROMA) & (hue_px >= STAMP_HUE[0]) & (hue_px <= STAMP_HUE[1])
         if float(red.sum()) >= DOUBT_STAMP_SHARE * ink:
             out.append("stamp_ink")
     # 7 several signatures
@@ -1010,7 +1019,7 @@ def assess_doubts(photo: Photo, dark: np.ndarray, mask: np.ndarray, frame: Tuple
     # (remark 63), or the auto ink is light blue.  Criterion 6 stays red / orange only.
     if auto_ink is not None:
         hue, chroma = lab_hue_chroma(auto_ink)
-        if stamp_like or (chroma >= 10.0 and BLUE_HUE[0] <= hue <= BLUE_HUE[1] and _lab_l(auto_ink) > DOUBT_STAMP_L):
+        if stamp_like or (chroma >= INK_CHROMA_MIN and BLUE_HUE[0] <= hue <= BLUE_HUE[1] and _lab_l(auto_ink) > DOUBT_STAMP_L):
             out.append("ink_stamp")
     return tuple(out)
 

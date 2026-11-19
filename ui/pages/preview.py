@@ -467,7 +467,7 @@ class Preview(Box):
         x0, y0 = self.lw - 9 - total, 9
         segs = []
         x = x0 + 3
-        for l, sw in zip(labels, ws):
+        for l, sw in zip(labels, ws, strict=True):
             segs.append((x, y0 + 3, sw, 30, l))
             x += sw + 2
         return (x0, y0, total, 36), segs

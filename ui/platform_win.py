@@ -195,7 +195,7 @@ def work_area(root) -> tuple:
                 r = mi.rcWork
                 return r.left, r.top, r.right - r.left, r.bottom - r.top
         except Exception:
-            log.debug("work_area: Exception caught", exc_info=True)
+            log.warning("work_area: Exception caught", exc_info=True)   # remark 115
     return 0, 0, int(root.winfo_screenwidth()), int(root.winfo_screenheight())
 
 
@@ -216,5 +216,5 @@ def frame_extra(root) -> tuple:
             frame = gsm(32) + gsm(92)                     # SM_CXSIZEFRAME + SM_CXPADDEDBORDER
             return 2 * frame, gsm(4) + 2 * frame          # SM_CYCAPTION
         except Exception:
-            log.debug("frame_extra: Exception caught", exc_info=True)
+            log.warning("frame_extra: Exception caught", exc_info=True)   # remark 115
     return 0, 0

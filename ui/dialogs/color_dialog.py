@@ -204,7 +204,7 @@ class CustomColorDialog(ContentDialog):
             self.f_hex.set(ex.rgb_to_hex((r, g, b)))
         self.f_hex.redraw()
         if skip != "rgb":
-            for f, v in zip(self.f_rgb, (r, g, b)):
+            for f, v in zip(self.f_rgb, (r, g, b), strict=True):
                 f.set(str(v))
         self._sync = False
 

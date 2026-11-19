@@ -362,3 +362,37 @@ def test_b14_c7_app_source():
     src = (ROOT / "ui" / "app.py").read_text(encoding="utf-8")
     assert "self.root.after(30, self._poll_worker)\n" in src and "if self.worker.busy():" in src
     assert "if changed or initial:" in src
+
+
+# ================================================================== 113, 115, 118 B9
+def test_r113_named_layout_and_thresholds():
+    from core import processing as P
+    from core import tinted as T
+    from ui import theme
+    from ui.pages import import_page as I
+    assert theme.HEADER_H == 64 and theme.ACTION_BAR_H == 64
+    assert (I.DROP_TILE, I.DROP_CONTENT_H, I.BUSY_CONTENT_H) == (84, 191, 112)
+    assert (P.COLOR_CHROMA, P.INK_CHROMA_MIN, P.MIN_INK_PX, P.INK_SAMPLE_PX) == (14.0, 10.0, 60, 40000)
+    assert (T.SMALL_SIDE_PX, T.PAPER_MIN_PX, T.INNER_MIN_PX) == (400, 100, 200)
+    for f in ("ui/app.py", "ui/pages/export_page.py", "ui/pages/process_page.py", "ui/pages/import_page.py"):
+        src = (ROOT / f).read_text(encoding="utf-8")
+        assert "geom(0, 64," not in src and "h - 64" not in src and "lh - 64" not in src, f
+
+
+def test_r115_unexpected_exceptions_warn():
+    assert 'log.warning("path_key' in (ROOT / "core" / "batch.py").read_text(encoding="utf-8")
+    src = (ROOT / "ui" / "app.py").read_text(encoding="utf-8")
+    assert 'log.warning("_window_scale' in src and 'log.exception("worker callback failed")' in src
+
+
+def test_b9_zip_strict():
+    pytest.importorskip("subprocess")
+    import shutil
+    import subprocess
+    import sys
+    ruff = shutil.which("ruff") or str(Path(sys.executable).with_name("ruff"))
+    if not Path(ruff).exists():
+        pytest.skip("ruff not installed")
+    r = subprocess.run([ruff, "check", "--select", "B905", "--output-format", "concise", "core", "ui"], cwd=ROOT,
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout

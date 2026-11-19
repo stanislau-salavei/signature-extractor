@@ -11,6 +11,10 @@ MIN_GAP = 5.0            # the two groups along the tint direction must be this 
 GROW_MM = 0.35
 PIECE_PCT = 30.0
 SPECK_MM2 = 0.3         # tiny ink pieces far from the strokes (stamp dust) go
+# remark 113 (audit B4)
+SMALL_SIDE_PX = 400      # a photo with a shorter side is processed at full size (else on a 4× smaller copy)
+PAPER_MIN_PX = 100       # fewer sampled paper pixels than this → no paper tint
+INNER_MIN_PX = 200       # fewer inner stroke pixels than this → no split by the tint direction
 SPECK_NEAR_MM = 1.0           # stroke edges are tinted too: keep dark pixels this close to an ink pixel
 
 
@@ -43,7 +47,7 @@ def white_balance(rgb: np.ndarray) -> np.ndarray:
     """Each channel divided by its paper background (closing + blur).  The background is smooth, so it is
     computed on a 4× smaller copy and scaled back — same result, ~10× faster."""
     h, w = rgb.shape[:2]; k = max(15, (min(h, w) // 25) | 1)
-    f = 4 if min(h, w) >= 400 else 1
+    f = 4 if min(h, w) >= SMALL_SIDE_PX else 1
     small = cv2.resize(rgb, (max(1, w // f), max(1, h // f)), interpolation=cv2.INTER_AREA) if f > 1 else rgb
     ks = max(5, (k // f) | 1)
     se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))
@@ -58,7 +62,7 @@ def paper_tint(lab: np.ndarray, core: np.ndarray):
     # remark 102 (audit C4): every 7th pixel first, then the mask (no copy of the whole frame); the sample is
     # another 1/7 of the paper, so the median may differ in the last digits
     px = lab.reshape(-1, 3)[::7][~core.ravel()[::7]].astype(np.float32)
-    if px.shape[0] < 100:
+    if px.shape[0] < PAPER_MIN_PX:
         return None
     a, b = float(np.median(px[:, 1])) - 128.0, float(np.median(px[:, 2])) - 128.0
     c = float(np.hypot(a, b))
@@ -74,7 +78,7 @@ def tinted_ink(rgb: np.ndarray, lab: np.ndarray, core: np.ndarray, ppm: float) -
     wlab = cv2.cvtColor(wrgb, cv2.COLOR_RGB2LAB).astype(np.float32)
     proj = (wlab[..., 1] - 128.0) * ua + (wlab[..., 2] - 128.0) * ub       # along the paper tint
     inner = cv2.erode(core.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
-    if inner.sum() < 200:
+    if inner.sum() < INNER_MIN_PX:
         return None
     L = wlab[..., 0][inner]
     sel = L <= np.percentile(L, 60)                                          # dark interiors only
@@ -357,7 +361,7 @@ def clean(mask, alpha, alpha_raw, line_px, ppm, removed=None):
     if len(flat) >= ROW_MIN_N:
         ys = np.array([cen[i, 1] for i in flat]); order = np.argsort(ys)
         grp = [[flat[order[0]]]]
-        for a_, b_ in zip(order[:-1], order[1:]):
+        for a_, b_ in zip(order[:-1], order[1:], strict=True):
             (grp[-1].append(flat[b_]) if ys[b_] - ys[a_] <= ROW_TOL_MM * ppm else grp.append([flat[b_]]))
         for g in grp:
             xs = [st[i, 0] for i in g] + [st[i, 0] + st[i, 2] for i in g]

@@ -168,7 +168,7 @@ def path_key(p: Path) -> str:
     try:
         return os.path.normcase(os.path.abspath(str(p)))
     except Exception:
-        log.debug("path_key: Exception caught", exc_info=True)   # remark 81
+        log.warning("path_key: Exception caught", exc_info=True)   # remark 81, 115
         return str(p)
 
 
@@ -314,7 +314,7 @@ def summary_text(i18n, photos: int, formats: int, files: int) -> str:
         groups = re.findall(r"([А-Яа-яё]+)/([А-Яа-яё]+)/([А-Яа-яё]+)", note)
         cats = {"one": 0, "few": 1, "many": 2}
         # group 0 = «формат», group 1 = «файл»; replace the word that follows each placeholder
-        for (ph, n), forms in zip((("{formats}", formats), ("{files}", files)), groups):
+        for (ph, n), forms in zip((("{formats}", formats), ("{files}", files)), groups, strict=False):
             m = re.search(re.escape(ph) + r" ([А-Яа-яё]+)", text)
             if m:
                 text = text[:m.start(1)] + forms[cats[ru_plural_category(n)]] + text[m.end(1):]

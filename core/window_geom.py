@@ -32,7 +32,7 @@ def fit_size(size: Tuple[float, float], avail: Tuple[float, float],
     """Clamp a client size (logical px) to the available client area of the screen: not larger than the
     screen, not smaller than the minimum — unless the screen itself is smaller than the minimum."""
     out = []
-    for v, a, lo in zip(size, avail, minimum):
+    for v, a, lo in zip(size, avail, minimum, strict=True):
         a = max(1, int(a))
         out.append(int(max(min(lo, a), min(int(round(v)), a))))
     return out[0], out[1]

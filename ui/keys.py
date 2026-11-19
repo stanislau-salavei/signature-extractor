@@ -9,9 +9,9 @@ from __future__ import annotations
 import string
 from typing import Optional
 
-_X11 = dict(zip("qwertyuiop", range(24, 34)))
-_X11.update(zip("asdfghjkl", range(38, 47)))
-_X11.update(zip("zxcvbnm", range(52, 59)))
+_X11 = dict(zip("qwertyuiop", range(24, 34), strict=True))
+_X11.update(zip("asdfghjkl", range(38, 47), strict=True))
+_X11.update(zip("zxcvbnm", range(52, 59), strict=True))
 
 KEYCODES = {
     "win32": {65 + i: c for i, c in enumerate(string.ascii_lowercase)},     # VK_A … VK_Z

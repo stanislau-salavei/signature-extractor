@@ -8,7 +8,7 @@ from typing import List, Optional
 from core import processing as P
 from ui import gfx
 from ui.pages.preview import Preview
-from ui.theme import S, Theme, elide
+from ui.theme import ACTION_BAR_H, HEADER_H, S, Theme, elide
 from ui.widgets.scroll import ScrollArea
 from ui.widgets.base import Box
 from ui.widgets.batch import STRIP_H, InfoBar, PhotoStrip
@@ -321,7 +321,7 @@ class FineTuneCard(Box):
         return 1 + 62 + 140 + 1 if self.open else 54
 
     def set_values(self, p: P.ProcessParams):
-        for sl, v in zip(self.sliders, (p.sensitivity, p.denoise, p.thickness)):
+        for sl, v in zip(self.sliders, (p.sensitivity, p.denoise, p.thickness), strict=True):
             if sl.value != v:
                 sl.set(v)
 
@@ -352,7 +352,7 @@ class FineTuneCard(Box):
         self.create_rectangle(S(1), S(63), S(w - 1), S(64), fill=Theme.c("divider"), width=0)
         t = self.app.t
         for i, (key, sl) in enumerate(zip(("process.finetune.sensitivity", "process.finetune.denoise",
-                                           "process.finetune.thickness"), self.sliders)):
+                                           "process.finetune.thickness"), self.sliders, strict=True)):
             top = 63 + 12 + 3 + 41 * i
             self.text(17, top + 8, t(key), 13)
             v = int(sl.value)
@@ -375,7 +375,7 @@ class BottomBar(Box):
         self.next_key = next_key
 
     def layout(self, x, y, w):
-        self.geom(x, y, w, 64)
+        self.geom(x, y, w, ACTION_BAR_H)
         self.back.set_text(self.app.t("common.back"))
         self.next.set_text(self.app.t(self.next_key))
         nw = self.next.natural_width()
@@ -578,9 +578,9 @@ class ProcessPage(Box):
     def layout(self, w, h):
         if w <= 0 or h <= 0:
             return
-        self.geom(0, 64, w, h)
+        self.geom(0, HEADER_H, w, h)
         lw = w - 24 - 24 - 16 - RIGHT_W
-        col_h = h - 64 - 16
+        col_h = h - ACTION_BAR_H - 16
         self.toolbar.layout(24, 0, lw)
         b = self.app.batch
         job = self.app.job
@@ -635,7 +635,7 @@ class ProcessPage(Box):
         self.preview.geom(24, y, lw, ph)
         self.preview.redraw()
         self.layout_right()
-        self.bar.layout(0, h - 64, w)
+        self.bar.layout(0, h - ACTION_BAR_H, w)
         self.redraw()
 
     def layout_right(self):
@@ -646,7 +646,7 @@ class ProcessPage(Box):
         for c in (self.c_flat, self.c_ink, self.c_fine):
             c.layout(0, y, RIGHT_W)
             y += c.height() + 8
-        col_h = self.lh - 64 - 16
+        col_h = self.lh - ACTION_BAR_H - 16
         if self.app.batch is not None:
             # «Применить ко всем» stays at the bottom of the right column; the cards scroll above it
             self.apply_btn.set_text(self.app.t("batch.apply_settings_all"))

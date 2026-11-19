@@ -476,7 +476,7 @@ class SettingsPage(Box):
     def sync(self):
         s, t = self.app.settings, self.app.t
         theme = s.get("theme", "system")
-        for r, v in zip(self.theme_radios, THEME_ORDER):
+        for r, v in zip(self.theme_radios, THEME_ORDER, strict=True):
             key = f"settings.theme.{v}"
             r.label = t(key)
             r.set(theme == v)

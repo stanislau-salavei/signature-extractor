@@ -384,7 +384,7 @@ def _dash_segments(bw: int, bh: int, lw: float, R: float, seg_on: float, seg_off
     segments = []
     on, remain = True, seg_on
     cur = [pts[0]]
-    for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+    for (ax, ay), (bx, by) in zip(pts, pts[1:], strict=False):
         L = math.hypot(bx - ax, by - ay)
         t = 0.0
         while L - t > 1e-6:

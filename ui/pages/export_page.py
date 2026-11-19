@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw
 from core import batch as B
 from core import export as ex
 from ui import gfx
-from ui.theme import F, S, Scale, Theme, blend, elide, text_width
+from ui.theme import ACTION_BAR_H, HEADER_H, F, S, Scale, Theme, blend, elide, text_width
 from ui.widgets.base import Box, Control, Tooltip
 from ui.widgets.controls import Button, ComboBox, IconButton, Link, Radio, Segmented, TextBox, Toggle
 from ui.widgets.overlay import MenuItem, MenuPopup, _paste_clip
@@ -314,7 +314,7 @@ class FormatCard(Card):
             self.chev.redraw()
             self.toggle.geom(w - 15 - 20 - 12 - 40, 21, 40, 20)
             t = p.app.t
-            for i, (r, m) in enumerate(zip(self.modes, ex.SVG_MODES)):
+            for i, (r, m) in enumerate(zip(self.modes, ex.SVG_MODES, strict=True)):
                 if p.svg_open:
                     r.label = t(f"export.svg.mode.{m}")
                     r.set(p.svg_mode == m)
@@ -628,7 +628,7 @@ class ExportBar(Box):
         self.cancel = Button(self, "", kind="secondary", bg="abar", command=page.cancel_batch_save)
 
     def layout(self, x, y, w):
-        self.geom(x, y, w, 64)
+        self.geom(x, y, w, ACTION_BAR_H)
         p = self.page
         t = p.app.t
         batch = p.app.batch is not None
@@ -748,12 +748,12 @@ class ExportPage(Box):
         try:
             size = repr(self.size_choice())
         except Exception:
-            log.debug("ExportPage.export_key: Exception caught", exc_info=True)   # remark 81
+            log.warning("ExportPage.export_key: Exception caught", exc_info=True)   # remark 81, 115
             size = repr((self.size_key, self.custom_w, self.custom_h))
         try:
             rgb = tuple(self.current_rgb())
         except Exception:
-            log.debug("ExportPage.export_key: Exception caught", exc_info=True)   # remark 81
+            log.warning("ExportPage.export_key: Exception caught", exc_info=True)   # remark 81, 115
             rgb = self.color_key
         return (self.selected_formats(), size, self.margin_mm, rgb, self.png_dpi, self.dxf_line_mm,
                 self.svg_mode, self.svg_line_mm)
@@ -1170,7 +1170,7 @@ class ExportPage(Box):
         cached = self._outline_cache[1] if ready else None
         cached_cl = self._outline_cache[2] if ready else None
         self._saving = True
-        self.bar.layout(0, self.lh - 64, self.lw)
+        self.bar.layout(0, self.lh - ACTION_BAR_H, self.lw)
 
         def work():
             return ex.write_outputs(folder, base, ex.build_outputs(job, cached, cached_cl))
@@ -1182,13 +1182,13 @@ class ExportPage(Box):
                 self.app.job.saved = True
             self.app.mark_saved()
             self.remember()
-            self.bar.layout(0, self.lh - 64, self.lw)
+            self.bar.layout(0, self.lh - ACTION_BAR_H, self.lw)
 
         def fail(exc):
             self._saving = False
             self.app.mark_save_failed()
             log.error("save failed: %s", exc)
-            self.bar.layout(0, self.lh - 64, self.lw)
+            self.bar.layout(0, self.lh - ACTION_BAR_H, self.lw)
             self.app.show_error_dialog(self.app.t("errors.save.title"), self.app.t("errors.save.body"),
                                        retry=lambda: self.start_write(folder, base, fmts))
         self.app.worker.submit("save", work, ok, fail)
@@ -1221,9 +1221,9 @@ class ExportPage(Box):
         self._saving = True
         self.app.saving = True
         Tooltip.cancel(None)
-        self.bar.layout(0, self.lh - 64, self.lw)
+        self.bar.layout(0, self.lh - ACTION_BAR_H, self.lw)
         self.app.root.update_idletasks()
-        self.dim.show(0, 64, self.lw, self.lh - 64)
+        self.dim.show(0, HEADER_H, self.lw, self.lh - ACTION_BAR_H)
         self.remember()
         self._save_next()
 
@@ -1408,14 +1408,14 @@ class ExportPage(Box):
 
     # ------------------------------------------------------------------ layout
     def layout(self, w, h):
-        self.geom(0, 64, w, h)
+        self.geom(0, HEADER_H, w, h)
         self.layout_all()
 
     def layout_all(self):
         if self.lw <= 0:
             return
         w, h = self.lw, self.lh
-        col_h = h - 64 - 16
+        col_h = h - ACTION_BAR_H - 16
         y = 0.0
         for c in (self.c_size, self.c_color, self.c_png, self.c_svg, self.c_dxf):
             c.layout(0, y, LEFT_W)
@@ -1435,9 +1435,9 @@ class ExportPage(Box):
             self.strip.hide()
             self.count.hide()
             self.preview.layout(rx, 0, rw, col_h)
-        self.bar.layout(0, h - 64, w)
+        self.bar.layout(0, h - ACTION_BAR_H, w)
         if self.dim.active:
-            self.dim.relayout(0, 64, w, h - 64)
+            self.dim.relayout(0, HEADER_H, w, h - ACTION_BAR_H)
 
     def refresh(self):
         super().refresh()

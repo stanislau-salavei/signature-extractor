@@ -3,9 +3,14 @@ from __future__ import annotations
 
 
 from ui import gfx
-from ui.theme import F, S, Theme
+from ui.theme import HEADER_H, F, S, Theme
 from ui.widgets.base import Box
 from ui.widgets.controls import Button, Link
+
+# remark 113 (audit B4): drop zone layout (logical px)
+DROP_TILE = 84          # accent tile with the upload icon
+DROP_CONTENT_H = 191    # tile + title + hint + buttons, centred in the drop zone
+BUSY_CONTENT_H = 112    # spinner + two lines while a photo opens
 
 
 class DropZone(Box):
@@ -50,13 +55,13 @@ class DropZone(Box):
         self.open_btn.label = self.app.t("menu.open_file")
         self.batch_btn.label = self.app.t("import.batch_folder")
         w1, w2 = self.open_btn.natural_width(), self.batch_btn.natural_width()
-        top = self._inner_top() + 84 + 6 + 16 + 29 + 16 + 4
+        top = self._inner_top() + DROP_TILE + 6 + 16 + 29 + 16 + 4
         x = (self.lw - (w1 + 10 + w2)) / 2
         self.open_btn.geom(x, top, w1, 36)
         self.batch_btn.geom(x + w1 + 10, top, w2, 36)
 
     def _inner_top(self):
-        return (self.lh - 191) / 2
+        return (self.lh - DROP_CONTENT_H) / 2
 
     def geom(self, x, y, w, h):
         super().geom(x, y, w, h)
@@ -77,21 +82,21 @@ class DropZone(Box):
             key = ("dash", w, h, Theme.c("drop_dash"))
             self.put_cached(12, 12, key, lambda: gfx.dashed_rrect(w - 24, h - 24, 8, Theme.c("drop_dash"), 1.5, 4, 4))
         if self.mode == "busy":
-            top = (h - 112) / 2
+            top = (h - BUSY_CONTENT_H) / 2
             self._draw_spinner()
             self.text(w / 2, top + 36 + 24 + 10, self.app.t("import.progress_title"), 16, "semibold", anchor="center")
             self.text(w / 2, top + 36 + 24 + 20 + 16 + 8, self.app.t("import.progress_sub"), 13, color="muted",
                       anchor="center")
             return
         top = self._inner_top()
-        self.rrect(w / 2 - 42, top, 84, 84, 8, "accent_soft_drop", bg=fill)
+        self.rrect(w / 2 - DROP_TILE / 2, top, DROP_TILE, DROP_TILE, 8, "accent_soft_drop", bg=fill)
         self.icon("upload", w / 2 - 20, top + 22, 40, "accent")
         title = self.app.t("import.drop_release" if over else "import.drop_title")
-        self.text(w / 2, top + 84 + 6 + 16 + 14.5, title, 24, "semibold", anchor="center")
+        self.text(w / 2, top + DROP_TILE + 6 + 16 + 14.5, title, 24, "semibold", anchor="center")
 
     def _draw_spinner(self):
         w, h = self.lw, self.lh
-        top = (h - 112) / 2
+        top = (h - BUSY_CONTENT_H) / 2
         x0, y0 = w / 2 - 18, top
         lw = 3
         # ring track + rotating accent arc (anti-aliased by Tk on Windows / Xft on Linux)
@@ -177,7 +182,7 @@ class ImportPage(Box):
             self.layout(self.lw, self.lh)
 
     def layout(self, w, h):
-        self.geom(0, 64, w, h)
+        self.geom(0, HEADER_H, w, h)
         top = 24
         if self.error_text:
             self.error.geom(24, top, w - 48, 48)

@@ -20,7 +20,7 @@ from core.settings import SettingsManager
 from core.state import AppState
 from core.worker import BackgroundWorker
 from ui import gfx, platform_win
-from ui.theme import Fonts, Scale, Theme
+from ui.theme import HEADER_H, Fonts, Scale, Theme
 from ui.widgets.base import Registry, Tooltip
 from ui.widgets.overlay import MenuItem, MenuPopup, Popup, TooltipLayer, widget_rect
 
@@ -46,7 +46,7 @@ try:
                 log.warning("tkdnd not available, drag and drop disabled", exc_info=True)
                 self.dnd_ok = False
 except Exception:  # pragma: no cover
-    log.debug("module: Exception caught", exc_info=True)   # remark 81
+    log.warning("module: Exception caught", exc_info=True)   # remark 81, 115
     DND_FILES = None
 
     class _Root(ctk.CTk):
@@ -229,7 +229,7 @@ class App:
         try:
             return float(ctk.ScalingTracker.get_window_scaling(self.root)) or 1.0
         except Exception:
-            log.debug("_window_scale: Exception caught", exc_info=True)
+            log.warning("_window_scale: Exception caught", exc_info=True)   # remark 115
             return 1.0
 
     def _apply_initial_geometry(self):
@@ -320,7 +320,7 @@ class App:
             self.help_page.layout(w, h)
             return
         self.header.layout(w)
-        body_h = h - 64
+        body_h = h - HEADER_H
         pages = {"import": self.import_page, "busy": self.import_page,
                  "process": self.process_page, "export": self.export_page}
         for name, pg in (("import", self.import_page), ("process", self.process_page), ("export", self.export_page)):

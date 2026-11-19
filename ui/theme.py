@@ -142,6 +142,11 @@ TOKENS: Dict[str, Tuple[str, str]] = {
 }
 
 
+# remark 113 (audit B4): layout heights shared by the pages (logical px, mockup)
+HEADER_H = 64          # window header (shell.Header)
+ACTION_BAR_H = 64      # bottom bar «Назад / Далее», «Сохранить»
+
+
 class Theme:
     """Current appearance; widgets register a refresh callback."""
 
