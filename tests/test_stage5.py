@@ -1,5 +1,6 @@
 """Stage 5 (2026-11-18): sizes manager (36/37/49/51/52/56), own colours in Settings, «Сообщить о проблеме»,
 updates (32, silent check, download + SHA-256), DirectX 12, Esc, language switch, 1000 px column, help texts."""
+from core.version import VERSION
 import csv
 import hashlib
 import importlib
@@ -223,7 +224,7 @@ def test_issue_url_has_version_windows_language(app, monkeypatch):
     url = app.issue_url()
     assert url.startswith("https://github.com/") and "/issues/new?body=" in url and "title=" not in url
     body = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["body"][0]
-    assert body == "App version: 1.0\nWindows: Windows 11 23H2 (build 22631)\nLanguage: ru\n\nDescribe the problem:\n"   # 88
+    assert body == f"App version: {VERSION}\nWindows: Windows 11 23H2 (build 22631)\nLanguage: ru\n\nDescribe the problem:\n"   # 88
     assert len(url) <= 2000
     opened = []
     monkeypatch.setattr(app, "open_url", opened.append)
@@ -269,12 +270,12 @@ def _controller(app, tmp_path, data=b"MZ" + b"y" * 300_000, sha=None, latest="1.
 
 def test_manual_check_latest_and_offline_notes(app, tmp_path):
     sp = settings(app)
-    up, _ = _controller(app, tmp_path, latest="1.0")
+    up, _ = _controller(app, tmp_path, latest=VERSION)
     sp._check_now()
     pump(app, until=lambda: not up.checking)
     pump(app, 30)
-    assert sp.update_note == "Установлена последняя версия (1.0)"
-    assert sp.c_upd.desc_lines() == ["Установлена последняя версия (1.0)"]
+    assert sp.update_note == f"Установлена последняя версия ({VERSION})"
+    assert sp.c_upd.desc_lines() == [f"Установлена последняя версия ({VERSION})"]
     up, _ = _controller(app, tmp_path, offline=True)
     sp._check_now()
     pump(app, until=lambda: not up.checking)

@@ -1,6 +1,7 @@
 """Remarks 86–89 (2026-11-19): the photo strip's scrollbar like the other Windows 11 bars (86), the file name
 template follows the language until it is edited (87), no graphics card / DirectX 12 in the issue form (88),
 the reason inside the yellow «Требует внимания» card in every case (89).  Synthetic photos only."""
+from core.version import VERSION
 import csv
 import inspect
 import urllib.parse
@@ -161,7 +162,7 @@ def test_r88_issue_body_without_gpu(app, monkeypatch):
     monkeypatch.setattr(pw, "windows_version", lambda: "Windows 11 23H2 (build 22631)")
     body = urllib.parse.parse_qs(urllib.parse.urlparse(app.issue_url()).query)["body"][0]
     assert "Graphics" not in body and "DirectX" not in body
-    assert body == "App version: 1.0\nWindows: Windows 11 23H2 (build 22631)\nLanguage: ru\n\nDescribe the problem:\n"
+    assert body == f"App version: {VERSION}\nWindows: Windows 11 23H2 (build 22631)\nLanguage: ru\n\nDescribe the problem:\n"
     r = rows()["issue.body"]
     assert "{gpu}" not in r[2] + r[3] and "{dx12}" not in r[2] + r[3]
 
