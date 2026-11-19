@@ -26,6 +26,8 @@ class BackgroundWorker:
         self.results: "queue.Queue[tuple]" = queue.Queue()
         self._latest: Dict[str, int] = {}
         self._counter = 0
+        self._active = 0          # remark 118 (audit B14): submitted, not yet delivered or dropped
+        self.on_submit: Optional[Callable[[], None]] = None   # the UI starts its polling (UI thread only)
         self._lock = threading.Lock()
         self._thread = threading.Thread(target=self._run, name="export-worker", daemon=True)
         self._thread.start()
@@ -36,7 +38,10 @@ class BackgroundWorker:
             self._counter += 1
             token = self._counter
             self._latest[channel] = token
+            self._active += 1
         self._tasks.put((priority, token, (channel, token, fn, on_done, on_error)))
+        if self.on_submit is not None:
+            self.on_submit()
         return token
 
     def cancel(self, channel: str) -> None:
@@ -48,10 +53,20 @@ class BackgroundWorker:
     def is_current(self, channel: str, token: int) -> bool:
         return self._latest.get(channel) == token
 
+    def busy(self) -> bool:
+        """Tasks queued, running or with a result not yet fetched by :meth:`poll`."""
+        with self._lock:
+            return self._active > 0
+
+    def _done_one(self) -> None:
+        with self._lock:
+            self._active -= 1
+
     def _run(self):
         while True:
             _prio, _seq, (channel, token, fn, on_done, on_error) = self._tasks.get()
             if not self.is_current(channel, token):
+                self._done_one()
                 continue
             try:
                 res = fn()
@@ -68,6 +83,7 @@ class BackgroundWorker:
                 channel, token, cb, res, exc = self.results.get_nowait()
             except queue.Empty:
                 return n
+            self._done_one()
             if not self.is_current(channel, token) or cb is None:
                 continue
             n += 1

@@ -255,3 +255,110 @@ def test_c9_heif_and_updater_imported_lazily():
     assert out == ["False", "True"]
     from ui import app as A
     assert isinstance(A.App.__dict__["updates"], property)
+
+
+# ================================================================== 96 + 116: plates, 97: photo cache
+def _cases():
+    import random
+    rnd = random.Random(5)
+    cols = ["#FFFFFF", "#F3F3F3", "#0067C0", "#E5E5E5", None]
+    for _ in range(40):
+        w, h = rnd.choice([rnd.uniform(5, 40), rnd.uniform(40, 700)]), rnd.choice([rnd.uniform(5, 40), rnd.uniform(40, 700)])
+        yield w, h, dict(radius=rnd.choice([0, 4, 8, min(w, h) / 2]), fill=rnd.choice(cols), stroke=rnd.choice(cols),
+                         stroke_w=rnd.choice([1, 1.5]), stroke_bottom=rnd.choice([None, "#000000"]),
+                         stroke_top=rnd.choice([None, "#1F1F1F"]), bg=rnd.choice(cols),
+                         fill_alpha=rnd.choice([1, 0.5]))
+
+
+@pytest.mark.parametrize("factor", [1.0, 1.25, 1.5])
+def test_r96_plate_same_pixels_as_whole_drawing(factor):
+    from ui import gfx
+    from ui.theme import Scale
+    old = Scale.factor
+    Scale.factor = factor
+    try:
+        for w, h, kw in _cases():
+            st = gfx.ShapeStyle(**kw)
+            W, H = max(1, int(round(w * factor))), max(1, int(round(h * factor)))
+            try:
+                whole = np.asarray(gfx._plate_px(W, H, st, (W, H)))
+            except ValueError:          # degenerate tiny boxes fail in Pillow the same way as in 1.0
+                continue
+            assert np.array_equal(np.asarray(gfx.plate(w, h, st)), whole), (w, h, kw)
+            assert np.array_equal(np.asarray(gfx.rrect(w, h, kw["radius"], kw["fill"], kw["stroke"], kw["stroke_w"],
+                                                       kw["stroke_top"], kw["stroke_bottom"], bg=kw["bg"],
+                                                       fill_alpha=kw["fill_alpha"])), whole)
+        for w, h, r in [(1000, 600, 8), (300, 40, 14), (28, 28, 14), (700, 90, 2)]:
+            W, H = int(round(w * factor)), int(round(h * factor))
+            k = gfx.SS * factor
+            seg = gfx._dash_segments(W * gfx.SS, H * gfx.SS, 1.5 * k, r * k, 4 * k, 4 * k)
+            whole = np.asarray(gfx._dash_band(seg, 1.5 * k, "#0067C0", 0, 0, W, H, (W, H)))
+            assert np.array_equal(np.asarray(gfx.dashed_rrect(w, h, r, "#0067C0")), whole), (w, h, r)
+    finally:
+        Scale.factor = old
+
+
+def test_r96_large_plate_is_fast():
+    import time
+    from ui import gfx
+    t = time.perf_counter()
+    gfx.rrect(1000, 600, 8, "#FFFFFF", "#E5E5E5", bg="#F3F3F3")
+    assert time.perf_counter() - t < 0.12
+
+
+def test_r97_photo_cache_limited_by_bytes(monkeypatch):
+    import os
+    if not os.environ.get("DISPLAY"):
+        pytest.skip("no X display")
+    import tkinter as tk
+    from PIL import Image
+    from ui import gfx
+    root = tk.Tk()
+    try:
+        gfx.clear_cache()
+        monkeypatch.setattr(gfx, "PHOTO_CACHE_BYTES", 100 * 100 * 4 * 3)
+        for i in range(10):
+            gfx.photo(("t", i), lambda: Image.new("RGBA", (100, 100)))
+        assert gfx.cache_bytes() <= gfx.PHOTO_CACHE_BYTES and len(gfx._photo_cache) == 3
+        assert ("t", 9, gfx.Scale.factor) in gfx._photo_cache and ("t", 0, gfx.Scale.factor) not in gfx._photo_cache
+        gfx.photo(("t", 7), lambda: 1 / 0)                    # hit: no factory call, becomes most recent
+        gfx.photo(("t", 10), lambda: Image.new("RGBA", (100, 100)))
+        assert ("t", 7, gfx.Scale.factor) in gfx._photo_cache and ("t", 8, gfx.Scale.factor) not in gfx._photo_cache
+    finally:
+        gfx.clear_cache()
+        root.destroy()
+
+
+# ================================================================== 118: B14 worker polling, C7 theme
+def test_b14_worker_busy_and_on_submit():
+    import threading
+    from core.worker import BackgroundWorker
+    w = BackgroundWorker()
+    calls, got = [], []
+    w.on_submit = lambda: calls.append(1)
+    assert not w.busy()
+    ev = threading.Event()
+    w.submit("a", lambda: ev.wait(5) or 1, got.append, None)
+    assert calls == [1] and w.busy()
+    ev.set()
+    import time
+    for _ in range(200):
+        w.poll()
+        if got:
+            break
+        time.sleep(0.01)
+    assert got == [1] and not w.busy()
+    w.submit("b", lambda: 2, got.append, None)
+    w.cancel("b")
+    for _ in range(200):
+        w.poll()
+        if not w.busy():
+            break
+        time.sleep(0.01)
+    assert not w.busy() and got == [1]
+
+
+def test_b14_c7_app_source():
+    src = (ROOT / "ui" / "app.py").read_text(encoding="utf-8")
+    assert "self.root.after(30, self._poll_worker)\n" in src and "if self.worker.busy():" in src
+    assert "if changed or initial:" in src

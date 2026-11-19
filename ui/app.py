@@ -113,7 +113,10 @@ class App:
         self._bind_keys()
         self._setup_dnd()
         ctk.ScalingTracker.add_widget(self._on_scaling, self.root)
-        self.root.after(30, self._poll_worker)
+        self._worker_polling = False
+        self.worker.on_submit = self._start_worker_poll     # remark 118 (audit B14): poll only while tasks run
+        if self.worker.busy():
+            self._start_worker_poll()
         self.root.after(1500, self._poll_system_theme)
         self._updates = None
         self.root.after(3000, lambda: self.updates.startup())     # stage 5: silent check, once a day
@@ -168,8 +171,9 @@ class App:
 
     def _apply_theme(self, initial=False):
         changed = Theme.set_mode(self._resolved_mode())
-        ctk.set_appearance_mode(Theme.mode)
-        self.root.configure(fg_color=Theme.c("bg"))
+        if changed or initial:              # remark 118 (audit C7): not on every 1.5 s poll of the system theme
+            ctk.set_appearance_mode(Theme.mode)
+            self.root.configure(fg_color=Theme.c("bg"))
         if initial:
             return
         if changed:
@@ -1099,12 +1103,20 @@ class App:
         self.show_page("import")
 
     # ------------------------------------------------------------------ worker
+    def _start_worker_poll(self):
+        if not self._worker_polling:
+            self._worker_polling = True
+            self.root.after(30, self._poll_worker)
+
     def _poll_worker(self):
         try:
             self.worker.poll()
         except Exception:
             log.exception("worker callback failed")
-        self.root.after(30, self._poll_worker)
+        if self.worker.busy():
+            self.root.after(30, self._poll_worker)
+        else:
+            self._worker_polling = False
 
     # ------------------------------------------------------------------ formatting
     def fmt_num(self, v: float, digits: int = 1) -> str:

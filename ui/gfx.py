@@ -2,14 +2,21 @@
 
 Every function returns a PIL image in *device* pixels for the current scale; ``photo()``
 wraps it into a cached ``ImageTk.PhotoImage``.
+
+Remark 96 (audit C1): large rounded plates are supersampled only around their corners and edges — the
+middle of a plate is the same column / row repeated, the inside of a dashed outline is empty.  The result
+is the same, pixel for pixel, as rendering the whole plate at 4×: with an integer factor LANCZOS gives every
+output pixel the same weights, so a pixel depends only on the 4× pixels within ±3 output px of it.
 """
 from __future__ import annotations
 
 import functools
 import logging
 import math
+from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageTk
@@ -19,24 +26,43 @@ from ui.theme import Scale, rgb
 log = logging.getLogger(__name__)
 
 SS = 4  # supersampling
+LANCZOS_REACH = 3      # output px on each side that LANCZOS (support 3) reads
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
-_photo_cache: Dict[tuple, ImageTk.PhotoImage] = {}
+# remark 97 (audit C2): least recently used images go first once the cache holds ~64 MB of pixels.  Images on
+# screen stay alive anyway: every widget keeps a reference to what it shows (Box._imgs).
+PHOTO_CACHE_BYTES = 64 * 1024 * 1024
+_photo_cache: "OrderedDict[tuple, Tuple[ImageTk.PhotoImage, int]]" = OrderedDict()
+_photo_bytes = 0
 
 
 def clear_cache() -> None:
+    global _photo_bytes
     _photo_cache.clear()
+    _photo_bytes = 0
     _icon_mask.cache_clear()
 
 
 def photo(key: tuple, factory) -> ImageTk.PhotoImage:
+    global _photo_bytes
     k = key + (Scale.factor,)
-    p = _photo_cache.get(k)
-    if p is None:
-        if len(_photo_cache) > 3000:
-            _photo_cache.clear()
-        p = ImageTk.PhotoImage(factory())
-        _photo_cache[k] = p
+    hit = _photo_cache.get(k)
+    if hit is not None:
+        _photo_cache.move_to_end(k)
+        return hit[0]
+    img = factory()
+    p = ImageTk.PhotoImage(img)
+    size = img.width * img.height * 4
+    _photo_cache[k] = (p, size)
+    _photo_bytes += size
+    while _photo_bytes > PHOTO_CACHE_BYTES and len(_photo_cache) > 1:
+        _old, (_p, n) = _photo_cache.popitem(last=False)
+        _photo_bytes -= n
     return p
+
+
+def cache_bytes() -> int:
+    """Pixels held by the PhotoImage cache (tests)."""
+    return _photo_bytes
 
 
 def rgba(c: str, a: float = 1.0) -> Tuple[int, int, int, int]:
@@ -48,18 +74,85 @@ def _dev(v: float) -> float:
     return v * Scale.factor
 
 
+@dataclass(frozen=True)
+class ShapeStyle:
+    """Remark 116 (audit B7): how a rounded plate looks — instead of a dozen parameters.
+
+    ``stroke_bottom`` paints the lower ``bottom_w`` px of the outline in another colour (Win11 elevation
+    border); ``stroke_top`` the upper 1 px; ``corners`` = (tl, tr, br, bl) rounded or square."""
+    radius: float = 0.0
+    fill: Optional[str] = None
+    stroke: Optional[str] = None
+    stroke_w: float = 1.0
+    stroke_top: Optional[str] = None
+    stroke_bottom: Optional[str] = None
+    bottom_w: float = 1.0
+    bg: Optional[str] = None
+    corners: Tuple[bool, bool, bool, bool] = (True, True, True, True)
+    fill_alpha: float = 1.0
+
+
 def rrect(w: float, h: float, r: float, fill: Optional[str], stroke: Optional[str] = None,
           stroke_w: float = 1.0, stroke_top: Optional[str] = None, stroke_bottom: Optional[str] = None,
           bottom_w: float = 1.0, bg: Optional[str] = None, corners=(True, True, True, True),
           fill_alpha: float = 1.0) -> Image.Image:
-    """Rounded rectangle (logical size) rendered at device scale.
+    """Rounded rectangle (logical size) rendered at device scale — see :class:`ShapeStyle`."""
+    return plate(w, h, ShapeStyle(r, fill, stroke, stroke_w, stroke_top, stroke_bottom, bottom_w, bg,
+                                  tuple(corners), fill_alpha))
 
-    ``stroke_bottom`` paints the lower ``bottom_w`` px of the outline in another colour
-    (Win11 elevation border); ``stroke_top`` the upper 1 px. ``corners`` = (tl, tr, br, bl)."""
+
+def _edge_px(style: ShapeStyle) -> int:
+    """Output px from each side of a plate whose 4× pixels may differ from the plate's middle (corners,
+    the shifted outlines of stroke_top / stroke_bottom) plus the reach of LANCZOS."""
+    k = SS * Scale.factor
+    zone = 2 * style.radius * k + max(style.stroke_w, style.bottom_w, 1.0) * k + 2
+    return int(math.ceil(zone / SS)) + LANCZOS_REACH + 1
+
+
+def _stretch(small: Image.Image, W: int, H: int, m: int) -> Image.Image:
+    """``small`` is 2·m + 1 px wide and / or high; its middle column / row repeated up to W × H."""
+    a = np.asarray(small)
+    if a.shape[1] != W:
+        a = np.concatenate([a[:, :m], np.repeat(a[:, m:m + 1], W - 2 * m, axis=1), a[:, -m:]], axis=1)
+    if a.shape[0] != H:
+        a = np.concatenate([a[:m], np.repeat(a[m:m + 1], H - 2 * m, axis=0), a[-m:]], axis=0)
+    return Image.fromarray(np.ascontiguousarray(a), "RGBA")
+
+
+def _reduce(im: Image.Image, W: int, H: int, full: Tuple[int, int]) -> Image.Image:
+    """LANCZOS reduction of a 4× RGBA drawing to W × H with Pillow's pass order for a ``full`` size image.
+
+    Pillow runs the vertical pass first when the height shrinks more than twice the width does, and the
+    8-bit image between the passes is rounded, so a part of a plate gets exactly the pixels of the whole
+    plate only with the same order."""
+    fw, fh = full
+    vertical_first = (fh * SS - fh) > (fw * SS - fw) * 2
+    a = im.convert("RGBa")
+    if vertical_first:
+        a = a.resize((W * SS, H), Image.Resampling.LANCZOS).resize((W, H), Image.Resampling.LANCZOS)
+    else:
+        a = a.resize((W, H * SS), Image.Resampling.LANCZOS).resize((W, H), Image.Resampling.LANCZOS)
+    return a.convert("RGBA")
+
+
+def plate(w: float, h: float, style: ShapeStyle) -> Image.Image:
+    """Rounded plate (logical size) at device scale; remark 96: a large one is drawn 2·m + 1 px wide / high
+    and its straight middle repeated (the same pixels as drawing it whole)."""
     W, H = max(1, int(round(_dev(w)))), max(1, int(round(_dev(h))))
+    m = _edge_px(style)
+    Ws, Hs = min(W, 2 * m + 1), min(H, 2 * m + 1)
+    small = _plate_px(Ws, Hs, style, (W, H))
+    return small if (Ws, Hs) == (W, H) else _stretch(small, W, H, m)
+
+
+def _plate_px(W: int, H: int, style: ShapeStyle, whole: Tuple[int, int]) -> Image.Image:
+    """The 4× drawing of a plate of W × H device px (the 1.0 rrect)."""
+    fill, stroke, stroke_w = style.fill, style.stroke, style.stroke_w
+    stroke_top, stroke_bottom, bottom_w = style.stroke_top, style.stroke_bottom, style.bottom_w
+    bg, corners, fill_alpha = style.bg, style.corners, style.fill_alpha
     big = (W * SS, H * SS)
     k = SS * Scale.factor
-    R = r * k
+    R = style.radius * k
     base = (0, 0, 0, 0) if bg is None else rgba(bg)
     im = Image.new("RGBA", big, base)
 
@@ -112,7 +205,7 @@ def rrect(w: float, h: float, r: float, fill: Optional[str], stroke: Optional[st
             im.alpha_composite(Image.composite(col, Image.new("RGBA", big, (0, 0, 0, 0)), m))
         else:
             im.paste(col, (0, 0), m)
-    return im.resize((W, H), Image.Resampling.LANCZOS)
+    return _reduce(im, W, H, whole)
 
 
 def triangle(w: float, h: float, color: str, bg: str, up: bool = True) -> Image.Image:
@@ -246,18 +339,38 @@ def checkbox(checked: bool, accent: str, tick: str, off_fill: str, off_stroke: s
 
 def dashed_rrect(w: float, h: float, r: float, color: str, width: float = 1.5, dash: float = 4,
                  gap: float = 4) -> Image.Image:
-    """Dashed rounded outline (transparent inside), path length based dashes."""
+    """Dashed rounded outline (transparent inside), path length based dashes.
+
+    Remark 96: a large outline is drawn as four 4× bands along its sides (top, bottom, left, right), each a
+    little wider than the outline and its corners plus the reach of LANCZOS; the inside stays empty."""
     k = SS * Scale.factor
     W, H = int(round(w * Scale.factor)), int(round(h * Scale.factor))
-    big = (W * SS, H * SS)
-    im = Image.new("RGBA", big, (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
     lw = width * k
-    inset = lw / 2
-    x0, y0, x1, y1 = inset, inset, big[0] - inset, big[1] - inset
     R = r * k
+    segments = _dash_segments(W * SS, H * SS, lw, R, dash * k, gap * k)
+    T = int(math.ceil((R + lw + 2) / SS)) + LANCZOS_REACH + 1          # band, output px
+    if 2 * T + 1 >= min(W, H):
+        return _dash_band(segments, lw, color, 0, 0, W, H, (W, H))
+    E = LANCZOS_REACH
+    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    full = (W, H)
+    out.paste(_dash_band(segments, lw, color, 0, 0, W, T + E, full).crop((0, 0, W, T)), (0, 0))
+    out.paste(_dash_band(segments, lw, color, 0, H - T - E, W, T + E, full).crop((0, E, W, T + E)), (0, H - T))
+    side_h = H - 2 * T
+    out.paste(_dash_band(segments, lw, color, 0, T - E, T + E, side_h + 2 * E, full).crop((0, E, T, E + side_h)),
+              (0, T))
+    out.paste(_dash_band(segments, lw, color, W - T - E, T - E, T + E, side_h + 2 * E, full)
+              .crop((E, E, T + E, E + side_h)), (W - T, T))
+    return out
+
+
+def _dash_segments(bw: int, bh: int, lw: float, R: float, seg_on: float, seg_off: float):
+    """Dash polylines (4× px) along the rounded outline of a bw × bh box, inset by half the line width."""
+    inset = lw / 2
+    x0, y0, x1, y1 = inset, inset, bw - inset, bh - inset
     # build the path as points
     pts = []
+
     def arc(cx, cy, a0, a1):
         n = 24
         for i in range(n + 1):
@@ -268,9 +381,8 @@ def dashed_rrect(w: float, h: float, r: float, color: str, width: float = 1.5, d
     pts.append((x0 + R, y1)); arc(x0 + R, y1 - R, 90, 180)
     pts.append((x0, y0 + R)); arc(x0 + R, y0 + R, 180, 270)
     # walk the path
-    seg_on, seg_off = dash * k, gap * k
+    segments = []
     on, remain = True, seg_on
-    col = rgba(color)
     cur = [pts[0]]
     for (ax, ay), (bx, by) in zip(pts, pts[1:]):
         L = math.hypot(bx - ax, by - ay)
@@ -285,13 +397,26 @@ def dashed_rrect(w: float, h: float, r: float, color: str, width: float = 1.5, d
             t = t2
             if remain <= 1e-6:
                 if on and len(cur) > 1:
-                    d.line(cur, fill=col, width=int(round(lw)), joint="curve")
+                    segments.append(cur)
                 on = not on
                 remain = seg_on if on else seg_off
                 cur = [(px, py)]
     if on and len(cur) > 1:
-        d.line(cur, fill=col, width=int(round(lw)), joint="curve")
-    return im.resize((W, H), Image.Resampling.LANCZOS)
+        segments.append(cur)
+    return segments
+
+
+def _dash_band(segments, lw: float, color: str, x: int, y: int, w: int, h: int,
+               full: Tuple[int, int]) -> Image.Image:
+    """Output px (x, y, w, h) of the dashed outline: its 4× pixels drawn and LANCZOS-reduced."""
+    im = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    col = rgba(color)
+    ox, oy = x * SS, y * SS
+    for seg in segments:
+        d.line([(px - ox, py - oy) for px, py in seg] if (ox or oy) else seg, fill=col, width=int(round(lw)),
+               joint="curve")
+    return _reduce(im, w, h, full)
 
 
 def checker(w: int, h: int, cell: int, c1: str, c2: str) -> Image.Image:
