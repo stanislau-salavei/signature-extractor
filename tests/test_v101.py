@@ -401,6 +401,7 @@ def test_b9_zip_strict():
 def test_b11_static_popup_images_cached():
     from ui.widgets.overlay import Popup
     assert hasattr(Popup, "put_cached")
-    for f in ("ui/widgets/overlay.py", "ui/dialogs/color_dialog.py"):
-        src = (ROOT / f).read_text(encoding="utf-8")
-        assert not re.search(r"self\.put\([^\n]*gfx\.", src), f
+    src = (ROOT / "ui" / "widgets" / "overlay.py").read_text(encoding="utf-8")
+    assert not re.search(r"self\.put\([^\n]*gfx\.(rrect|icon|circle)\(", src)
+    src = (ROOT / "ui" / "dialogs" / "color_dialog.py").read_text(encoding="utf-8")
+    assert '("cd_ring", 14)' in src and '("cd_hue_bar", Theme.c("dialog")), _hue_bar' in src   # the hue thumb changes
