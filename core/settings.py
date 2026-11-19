@@ -64,6 +64,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "last_update_check": None,    # stage 5: ISO time of the last silent check / «Позже» (once a day)
     "custom_sizes": [],
     "custom_colors": [],
+    "window": None,               # remark 92: {"w", "h", "maximized"} — normal client size in logical px
     "last_export": {},            # formats, size, custom_w/h, png_dpi, color, svg_mode — kept after «Готово»
     "settings_version": 3,
 }
@@ -116,6 +117,8 @@ def _valid(key: str, value: Any) -> bool:
     d = DEFAULT_SETTINGS[key]
     if key in ("save_folder", "name_template", "last_update_check"):
         return value is None or isinstance(value, str)
+    if key == "window":
+        return value is None or isinstance(value, dict)
     if key == "theme":
         return value in ("system", "light", "dark")
     if key == "language":
@@ -248,7 +251,8 @@ class SettingsManager:
         return new_default
 
     # remark 37: «Восстановить параметры по умолчанию» keeps the user's own size templates and colours
-    KEEP_ON_RESET = ("custom_sizes", "custom_colors", "settings_version", "last_update_check")
+    KEEP_ON_RESET = ("custom_sizes", "custom_colors", "settings_version", "last_update_check",
+                     "window")                   # remark 92: the window size is not a setting
 
     def reset_to_defaults(self) -> None:
         """All settings back to DEFAULT_SETTINGS (last_export forgotten too), except KEEP_ON_RESET."""

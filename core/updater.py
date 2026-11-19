@@ -26,6 +26,57 @@ from typing import Callable, Optional, Tuple
 log = logging.getLogger(__name__)
 
 API_LATEST = "https://api.github.com/repos/stanislau-salavei/signature-extractor/releases/latest"
+API_ENV = "SE_UPDATE_API"         # stage 6 (D7): «…/repos/<owner>/<test-repo>/releases/latest» for testing updates
+
+
+# remark 93: quotes, spaces and invisible characters that come with a copied value (cmd «set X="…"», chat
+# quotes, zero-width spaces, BOM, NBSP) are cut off the ends of SE_UPDATE_API
+_TRIM = " \t\r\n\"'`\u00a0\u00ab\u00bb\u2018\u2019\u201a\u201c\u201d\u201e\u200b\u200c\u200d\u2060\ufeff"
+
+
+def clean_url(value: str) -> str:
+    return str(value or "").strip(_TRIM)
+
+
+def api_url() -> str:
+    """``releases/latest`` of the project; the environment variable SE_UPDATE_API replaces it (update tests
+    against a separate test repository, the published releases are not touched).  A value that is not an
+    http(s) address is ignored with a warning in the log (remark 93)."""
+    raw = os.environ.get(API_ENV)
+    if raw is None or not raw.strip(_TRIM):
+        return API_LATEST
+    v = clean_url(raw)
+    if v.startswith(("https://", "http://")) and not any(c.isspace() for c in v):
+        return v
+    log.warning("%s ignored (not an http(s) address): %r; using %s", API_ENV, raw, API_LATEST)
+    return API_LATEST
+
+
+def is_latest_endpoint(url: str) -> bool:
+    return str(url or "").rstrip("/").endswith("/releases/latest")
+
+
+def describe_error(exc: BaseException) -> str:
+    """Remark 93: one line for the log — error class, HTTP code, rate limit and its reset time."""
+    import urllib.error
+    parts = [type(exc).__name__]
+    if isinstance(exc, urllib.error.HTTPError):
+        parts.append(f"HTTP {exc.code} {exc.reason}")
+        hdrs = exc.headers or {}
+        remaining, reset = hdrs.get("X-RateLimit-Remaining"), hdrs.get("X-RateLimit-Reset")
+        if exc.code in (403, 429) and (remaining is not None or reset):
+            when = "?"
+            try:
+                when = _dt.datetime.fromtimestamp(int(reset)).astimezone().isoformat(timespec="seconds")
+            except (TypeError, ValueError, OverflowError, OSError):
+                log.debug("describe_error: bad X-RateLimit-Reset %r", reset, exc_info=True)
+            parts.append(f"rate limit (remaining {remaining}), resets {when}")
+    else:
+        reason = getattr(exc, "reason", None)
+        parts.append(str(reason if reason is not None else exc))
+    return ", ".join(p for p in parts if p)
+
+
 USER_AGENT = "signature-extractor-updater"
 TIMEOUT = 8.0
 CHUNK = 64 * 1024
@@ -100,12 +151,23 @@ def parse_release(data: dict) -> Release:
 
 
 def check_latest(current: str, api_url: str = API_LATEST, fetcher: Callable[[str], bytes] = None) -> CheckResult:
-    """Never raises: no network / bad answer → «offline»."""
+    """Never raises: no network / bad answer → «offline».  Remark 93: HTTP 404 from ``releases/latest``
+    (the repository has no release yet) means there is nothing newer → «latest»; every failure is written to
+    the log as a WARNING with the address, the error class and the HTTP code."""
+    import urllib.error
     fetcher = fetcher or fetch
     try:
         data = json.loads(fetcher(api_url).decode("utf-8"))
         rel = parse_release(data)
-    except Exception:
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404 and is_latest_endpoint(api_url):
+            log.warning("update check %s: HTTP 404 — no published release yet, treated as up to date", api_url)
+            return CheckResult("latest")
+        log.warning("update check %s failed: %s", api_url, describe_error(exc))
+        log.debug("check_latest: HTTPError caught", exc_info=True)
+        return CheckResult("offline")
+    except Exception as exc:
+        log.warning("update check %s failed: %s", api_url, describe_error(exc))
         log.debug("check_latest: Exception caught", exc_info=True)   # remark 81
         return CheckResult("offline")
     if is_newer(rel.version, current):

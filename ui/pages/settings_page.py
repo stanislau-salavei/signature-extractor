@@ -32,7 +32,7 @@ DPI_COMBO_MIN = 120
 GAP = 7
 GROUP_GAP = 28          # + header 20 + 8 = 56 between groups
 REPO = "https://github.com/stanislau-salavei/signature-extractor"
-RELEASE_TAG = "v1.0"   # remark 84: tag of release v1.0 (same as ui.app.RELEASE_TAG)
+from core.version import RELEASE_TAG  # noqa: E402  remark 84: tag of release v1.0 (same as ui.app.RELEASE_TAG)
 LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
 PAGE_MAX_W = 1000      # stage 5 (2k_25 / 2k_27): .col {max-width: 1000px; margin: 0 auto}
 SIZE_ROW_H = 40         # 36: rows of «Размеры подписи» 40 apart, first centre 24 below the divider

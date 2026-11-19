@@ -30,8 +30,7 @@ log = logging.getLogger(__name__)
 ROOT_DIR = Path(__file__).resolve().parents[1]
 REPO_URL = "https://github.com/stanislau-salavei/signature-extractor"
 LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
-VERSION = "1.0"
-RELEASE_TAG = "v" + VERSION          # remark 84: the release is v1.0 and its Git tag is v1.0 (not v1.0.0)
+from core.version import RELEASE_TAG, VERSION   # noqa: E402  remark 84: release v1.0, Git tag v1.0 (not v1.0.0)
 CLIENT_W, CLIENT_H = 1280, 768      # 1280 × 800 together with the 32 px title bar (mockups)
 MIN_W, MIN_H = 1024, 648            # 1024 × 680 window
 
@@ -100,8 +99,7 @@ class App:
         self._apply_theme(initial=True)
         self.root.title(self.t("app.name"))
         self._set_icon()
-        self.root.geometry(f"{CLIENT_W}x{CLIENT_H}")
-        self.root.minsize(MIN_W, MIN_H)
+        self._apply_initial_geometry()      # remark 92: remembered size, centred, fitted to the screen
 
         from ui.shell import Header
         from ui.pages.import_page import ImportPage
@@ -114,6 +112,8 @@ class App:
         TooltipLayer(self)
 
         self.root.bind("<Configure>", self._on_configure)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        platform_win.acquire_instance_mutex()          # stage 6: the installer asks to close the running app
         self._bind_keys()
         self._setup_dnd()
         ctk.ScalingTracker.add_widget(self._on_scaling, self.root)
@@ -129,6 +129,8 @@ class App:
         self.root._withdraw_called_before_window_exists = False
         self.root.update_idletasks()
         platform_win.set_caption_colors(self.root, Theme.c("bg"), Theme.c("text"), Theme.dark())
+        if self._start_maximized:
+            self.set_maximized(True)
         self.update_header()
         self.layout()
 
@@ -223,10 +225,87 @@ class App:
         Registry.refresh_all()
         self.layout(force=True)
 
+    # ------------------------------------------------------------------ window size (remark 92)
+    def _window_scale(self) -> float:
+        try:
+            return float(ctk.ScalingTracker.get_window_scaling(self.root)) or 1.0
+        except Exception:
+            log.debug("_window_scale: Exception caught", exc_info=True)
+            return 1.0
+
+    def _apply_initial_geometry(self):
+        """Size and maximized state from the last launch; the position is not remembered — centred in the
+        work area; a size larger than the current screen is reduced to fit."""
+        from core import window_geom as WG
+        scale = self._window_scale()
+        w, h, x, y, maxi, mw, mh = WG.initial_geometry(
+            self.settings.get("window"), platform_win.work_area(self.root), platform_win.frame_extra(self.root),
+            scale, (CLIENT_W, CLIENT_H), (MIN_W, MIN_H))
+        self.root.minsize(mw, mh)
+        self.root.geometry(f"{w}x{h}+{x}+{y}")
+        self._normal_size = (w, h)
+        self._start_maximized = maxi
+        self._was_maximized = maxi
+
+    def is_maximized(self) -> bool:
+        try:
+            if sys.platform.startswith("win"):
+                return self.root.state() == "zoomed"
+            # X11 (development only): without a window manager the attribute may not be applied
+            return bool(int(self.root.attributes("-zoomed"))) or bool(getattr(self, "_x11_zoomed", False))
+        except Exception:
+            log.debug("is_maximized: Exception caught", exc_info=True)
+            return False
+
+    def set_maximized(self, on: bool):
+        try:
+            if sys.platform.startswith("win"):
+                self.root.state("zoomed" if on else "normal")
+            else:
+                self._x11_zoomed = bool(on)
+                self.root.attributes("-zoomed", bool(on))
+        except Exception:
+            log.warning("set_maximized: Exception caught", exc_info=True)
+        self._was_maximized = bool(on)
+
+    def _track_window(self, e):
+        try:
+            st = self.root.state()
+        except Exception:
+            log.debug("_track_window: Exception caught", exc_info=True)
+            return
+        if st not in ("normal", "zoomed"):           # minimized: keep what was known before
+            return
+        maxi = self.is_maximized()
+        self._was_maximized = maxi
+        if not maxi and e.width > 1 and e.height > 1:
+            sc = self._window_scale()
+            self._normal_size = (e.width / sc, e.height / sc)
+
+    def save_window_state(self):
+        """Remember the normal size and the maximized flag (logical px) in settings.json."""
+        from core import window_geom as WG
+        try:
+            w, h = getattr(self, "_normal_size", (CLIENT_W, CLIENT_H))
+            val = WG.to_saved(w, h, getattr(self, "_was_maximized", False))
+            if self.settings.get("window") != val:
+                self.settings.set("window", val)
+        except Exception:
+            log.warning("save_window_state: Exception caught", exc_info=True)
+
+    def _on_close(self):
+        self.save_window_state()
+        try:
+            self.worker.cancel("process")
+        except Exception:
+            log.warning("App._on_close: Exception caught", exc_info=True)
+        self.root.destroy()
+
     # ------------------------------------------------------------------ layout
     def _on_configure(self, e):
         if e.widget is not self.root:
             return
+        self._track_window(e)
         size = (e.width, e.height)
         if size != self._last_size:
             self._last_size = size
@@ -427,6 +506,7 @@ class App:
 
     def quit(self):
         """Close the app (the update installer has started)."""
+        self.save_window_state()
         try:
             self.worker.cancel("process")
         except Exception:

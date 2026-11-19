@@ -6,6 +6,7 @@ venv/
 build/
 dist/
 *.spec
+!packaging/*.spec
 # личные фото и данные для тестов хранятся только локально
 tests/data/
 *.jpg
