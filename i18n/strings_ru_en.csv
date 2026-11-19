@@ -89,14 +89,12 @@ color.custom,"10, 59–61",Свой цвет,Custom color,Dialog 10 title and to
 color.on_paper,10,На бумаге,On paper,
 color.on_transparent,10,На прозрачном фоне,On transparent background,"Longer than Russian; label above a small preview, may need two lines."
 color.hue,10,Оттенок,Hue,
-color.name_placeholder,10,"Например, Фиолетовый","For example, Purple",Placeholder; the example name must match color.example_purple.
+color.name_placeholder,10,"Например, Фиолетовый","For example, Purple",Placeholder with an example colour name.
 color.as_photo,59–61,Как на фото,As in photo,Swatch tooltip; keeps the ink color from the photo.
 color.black,59–61,Чёрный,Black,Built-in color #000000.
 color.blue,"11–13, 16–18, 27, 33, 35–37, 48, 49, 51, 52, 54, 56, 58–61, 63–67",Синий,Blue,"Built-in color #1B2A8A, default; also the collapsed card value and Settings default."
 color.ink_blue,59–61,Чернильный синий,Ink blue,Built-in color #0B1F5C.
 color.bright_blue,59–61,Яркий синий,Bright blue,Built-in color #1D3FBF.
-color.example_purple,"60, 61",Фиолетовый,Purple,"Example user-added color (#3A2F8F) in mockups 60/61; user data, not a built-in string."
-color.example_burgundy,27,Бордо,Burgundy,"Remark 47 (2026-11-18, mockup /workspace/rewrite/mockup_colors): Example user-added color in mockup_colors; user data, not a built-in string."
 export.size,"11–13, 16–18, 21, 26, 33, 35, 48, 54, 58–61, 63",Размер подписи,Signature size,Card title; also a help heading.
 export.size.as_original,"35–37, 48, 49, 51, 52, 56, 58, 63",Как в исходнике,As in original,ComboBox item.
 export.size.preset_15x5,"11, 13, 16–18, 27, 35–37, 49, 51, 52, 54, 56, 58–61, 64–67",15 × 5 мм,15 × 5 mm,Default preset; matches the signature box of the GOST title block on Russian engineering drawings.
@@ -130,7 +128,6 @@ export.vector_tag,"11–13, 59 (SVG/DXF tabs)",{size} · вектор · ≈ {kb
 export.save_count,"11, 12, 33, 35, 48, 54, 58–61",Сохранить ({n} файла),one: Save (1 file) | other: Save ({n} files),plural. Russian: one «Сохранить ({n} файл)» / few «({n} файла)» / many «({n} файлов)».
 export.saved_status,"13, 18",Сохранено {n} файла в папку «{folder}»,one: Saved 1 file to “{folder}” | other: Saved {n} files to “{folder}”,"plural. Russian: one «Сохранён {n} файл…» / few «Сохранено {n} файла…» / many «Сохранено {n} файлов…» (13 uses 2 файла, 18 uses 100 файлов)."
 export.default_folder,"13, 18, 27, 43",Подписи,Signatures,Default save folder name (Documents\Signatures). Folder name is data: an existing user folder keeps its name.
-export.path_example,"27, 36, 37, 49, 51, 52, 56, 64–67",C:\Users\Stanislau\Documents\Подписи,C:\Users\Stanislau\Documents\Signatures,Example path from the mockup; real value comes from the system.
 batch.counter,"14, 16–18, 38–42, 46",Фото {i} из {n},Photo {i} of {n},
 batch.prev,"14, 16–18, 38–42, 46, 63",Предыдущие фото,Previous photos,Tooltip on the strip scroll arrow.
 batch.next,"14, 16–18, 38–42, 46, 63",Следующие фото,Next photos,Tooltip on the strip scroll arrow.

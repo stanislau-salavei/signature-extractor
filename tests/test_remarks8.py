@@ -208,7 +208,7 @@ def test_r62_reasons_one_per_line():
 # ------------------------------------------------------------------ i18n, help
 def test_r59_71_i18n_rows_and_csv_identity():
     r = rows()
-    assert len(r) == 345          # remark 78 removed 10 rows, remark 90 one (tests/i18n_prompt_diff.py)
+    assert len(r) == 342          # remark 78 removed 10 rows, remark 90 one (tests/i18n_prompt_diff.py), remark 110 three
     assert_matches_prompt(CSV, PROMPT_CSV)     # remarks 77–85: approved differences only
     exp = {
         "batch.doubt.pale": ("Подпись бледная — проверьте, все ли штрихи на месте", "The signature is faint — check that all strokes are there"),

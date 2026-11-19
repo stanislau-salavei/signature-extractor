@@ -64,10 +64,16 @@ def test_r91_prompt_copy_in_the_repository():
         assert (docs / name).exists(), name
     assert D.PROMPT_DIR == docs and D.PROMPT_CSV == docs / "i18n" / "strings_ru_en.csv"
     local = Path(os.environ.get("SE_PROMPT_FALLBACK", "/workspace/prompt/v2"))
-    if local.exists():                                                  # the copy is not edited
+    if local.exists():                                                  # the copy is not edited …
         for p in local.rglob("*"):
-            if p.is_file():
+            if p.is_file() and p.name != "strings_ru_en.csv":
                 assert filecmp.cmp(p, docs / p.relative_to(local), shallow=False), p
+        # … except remark 110 (1.0.1): three unused example rows removed, the note of color.name_placeholder fixed
+        gone = (b"export.path_example,", b"color.example_purple,", b"color.example_burgundy,")
+        src = [line for line in (local / "i18n" / "strings_ru_en.csv").read_bytes().split(b"\n") if not line.startswith(gone)]
+        src = b"\n".join(src).replace(b"Placeholder; the example name must match color.example_purple.",
+                                      b"Placeholder with an example colour name.")
+        assert (docs / "i18n" / "strings_ru_en.csv").read_bytes() == src
     D.assert_matches_prompt(CSV)
 
 

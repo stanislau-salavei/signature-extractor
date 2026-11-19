@@ -283,7 +283,8 @@ def test_r46_58_i18n_rows_and_csv_identity():
     assert r["settings.add_color"][2:4] == ["Добавить цвет", "Add color"]
     assert r["settings.delete_color.title"][2:4] == ["Удалить цвет «{name}»?", "Delete color “{name}”?"]
     assert r["settings.delete_color.default_note"][2] == "По умолчанию станет {name}"
-    assert r["color.example_burgundy"][2:4] == ["Бордо", "Burgundy"]
+    # remark 110: the mockup examples color.example_purple / color.example_burgundy / export.path_example are gone
+    assert not {"color.example_burgundy", "color.example_purple", "export.path_example"} & set(r)
     assert r["settings.dxf_line"][2:4] == ["Толщина DXF", "DXF thickness"]
     assert r["settings.dxf_line.desc"][2:4] == ["Толщина линий в DXF-файле, в миллиметрах",
                                                 "Line thickness in the DXF file, in millimeters"]
