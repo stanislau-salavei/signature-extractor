@@ -15,8 +15,8 @@ from PIL import Image, ImageChops, ImageDraw, ImageTk
 
 from core import processing as P
 from ui import gfx
-from ui.theme import F, S, Scale, Theme, blend, rgb, text_width
-from ui.widgets.base import Box, Tooltip
+from ui.theme import F, S, Scale, Theme, blend, text_width
+from ui.widgets.base import Box
 from ui.widgets.overlay import _paste_clip
 
 log = logging.getLogger(__name__)
@@ -481,7 +481,6 @@ class Preview(Box):
 
     def _overlays(self, out):
         job = self.job
-        k = Scale.factor
         if job is not None and job.result is not None:
             sx = 1 + (self.lw - 2) * self.split
             ih = self.lh - 2
@@ -632,7 +631,7 @@ class Preview(Box):
         elif hit[0] == "split":
             cur = CUR_WE
         elif hit[0] in ("pipette", "erase"):
-            cur = "none" if IS_WIN or True else "crosshair"
+            cur = "none"
         elif hit[0] == "frame":
             e = hit[1]
             cur = {"move": "fleur", "l": CUR_WE, "r": CUR_WE, "t": CUR_NS, "b": CUR_NS,

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import re
-import threading
 from pathlib import Path
 from tkinter import filedialog
 from typing import Callable, List, Optional
@@ -17,7 +16,7 @@ from typing import Callable, List, Optional
 from core import export as ex
 from ui import gfx
 from ui.theme import S, Theme, elide, text_width
-from ui.widgets.base import Box, Control
+from ui.widgets.base import Box
 from ui.widgets.controls import Button, CheckRow, ComboBox, IconButton, Link, Radio, TextBox, Toggle
 from ui.widgets.overlay import MenuItem, MenuPopup, widget_rect
 from ui.widgets.scroll import ScrollArea
@@ -27,13 +26,10 @@ log = logging.getLogger(__name__)
 CARD_H = 63
 FMT_ROWS_H = 147        # «Форматы по умолчанию»: three checkbox rows, 49 each
 SVG_LINE_ROW_H = 64     # remark 32: «Толщина SVG» card, second row «Толщина линии» (variant B)
-COLOR_COMBO_MIN, COLOR_COMBO_MAX = 140, 240   # remark 35: grows to the longest colour name, then «…»
 DPI_COMBO_MIN = 120
 GAP = 7
 GROUP_GAP = 28          # + header 20 + 8 = 56 between groups
-REPO = "https://github.com/stanislau-salavei/signature-extractor"
-from core.version import RELEASE_TAG  # noqa: E402  remark 84: tag of release v1.0 (same as ui.app.RELEASE_TAG)
-LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
+from core.version import LICENSE_URL, RELEASE_TAG, REPO_URL  # noqa: E402  remark 84 / 118 (A13): one place
 PAGE_MAX_W = 1000      # stage 5 (2k_25 / 2k_27): .col {max-width: 1000px; margin: 0 auto}
 SIZE_ROW_H = 40         # 36: rows of «Размеры подписи» 40 apart, first centre 24 below the divider
 SIZE_BTN_H = 32
@@ -209,13 +205,13 @@ class SettingsPage(Box):
         self.c_about = SCard(inner, self, None, lambda: t("app.name"), lambda: t("app.description"),
                              summary=lambda: t("settings.version", version=app.VERSION_STR), expandable=True, open_=True, body_h=lambda: 267, logo=True)
         self.about_links = [
-            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(f"{REPO}/releases/tag/{RELEASE_TAG}")),
+            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(f"{REPO_URL}/releases/tag/{RELEASE_TAG}")),
              "settings.release_notes"),
-            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(f"{REPO}/releases")),
+            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(f"{REPO_URL}/releases")),
              "settings.all_releases"),
             (Link(self.c_about, "", 13.5, "link", bg="card", command=app.report_issue),
              "settings.report_issue"),
-            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(REPO)),
+            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(REPO_URL)),
              "settings.source_code"),
         ]
         self.license_link = Link(self.c_about, "GNU GPLv3", 13.5, "link", bg="card",
@@ -405,7 +401,7 @@ class SettingsPage(Box):
     def _add_color(self):
         from ui.dialogs.color_dialog import CustomColorDialog
         from ui.dialogs.colors import add_color
-        CustomColorDialog(self.app, None, None, lambda name, hx: (add_color(self.app, name, hx), self.sync()))
+        CustomColorDialog(self.app, None, lambda name, hx: (add_color(self.app, name, hx), self.sync()))
 
     def _edit_color(self, key):
         from ui.dialogs.color_dialog import CustomColorDialog
@@ -413,7 +409,7 @@ class SettingsPage(Box):
         c = find_custom(self.app, key)
         if c is None:
             return
-        CustomColorDialog(self.app, None, None, lambda name, hx: (edit_color(self.app, key, name, hx), self.sync()),
+        CustomColorDialog(self.app, None, lambda name, hx: (edit_color(self.app, key, name, hx), self.sync()),
                           edit=c)
 
     def _delete_color(self, key):

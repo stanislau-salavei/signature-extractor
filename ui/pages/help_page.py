@@ -10,7 +10,6 @@ Stage 5 (2k_25): header and body (topics + text) are at most 1000 px wide and ce
 from __future__ import annotations
 
 from ui.dialogs.formats_help import _Content, topic_blocks
-from ui.theme import Theme
 from ui.widgets.base import Box, Control
 from ui.widgets.controls import IconButton
 from ui.widgets.scroll import ScrollArea

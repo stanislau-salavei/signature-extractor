@@ -204,8 +204,7 @@ class Fonts:
             # dev/test on Linux: fontconfig aliases (tools/fonts.conf) give true 600 / 500 weights
             cls.semibold_family, cls.medium_family = "Inter SemiBold", "Inter Medium"
         elif sys.platform.startswith("win"):
-            med = ["Segoe UI Variable Text Semibold"]  # Segoe has no Medium in GDI; 500 -> regular
-            cls.medium_family = None
+            cls.medium_family = None                   # Segoe has no Medium in GDI; 500 -> regular
         log.info("fonts: %s / %s", cls.regular_family, cls.semibold_family or "bold")
         cls._cache.clear()
 

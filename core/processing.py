@@ -16,7 +16,7 @@ from __future__ import annotations
 import io
 import logging
 import math
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
@@ -51,7 +51,6 @@ FALLBACK_DPI = 300.0
 DEFAULT_SENSITIVITY = 62
 DEFAULT_DENOISE = 35
 DEFAULT_THICKNESS = 0
-THICKNESS_RANGE = (-3, 3)
 
 
 class ImageLoadError(Exception):

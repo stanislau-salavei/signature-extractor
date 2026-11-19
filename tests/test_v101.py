@@ -122,3 +122,50 @@ def test_a14_one_scrollbar_mixin():
     assert issubclass(scroll.ScrollBar, scroll.BarMixin) and issubclass(batch._HBar, scroll.BarMixin)
     for cls in (scroll.ScrollBar, batch._HBar):
         assert "thumb_rect" not in cls.__dict__ and "_thumb" not in cls.__dict__
+
+
+# ================================================================== 118: small findings A7–A13
+def test_a7_a11_unused_constants_and_parameters_removed():
+    import inspect
+    from core import export, processing, ruling, tinted
+    from ui.dialogs import color_dialog, formats_help
+    from ui.pages import settings_page
+    from ui.widgets import controls, overlay
+    for mod, names in ((export, ["CELL_PADDING_MM"]), (processing, ["THICKNESS_RANGE"]), (ruling, ["RULE_SPAN"]),
+                       (tinted, ["SOFT", "SEED_AT", "SEED_MM2"]), (color_dialog, ["BOARD_H"]),
+                       (formats_help, ["FOOT_H", "PAD_B"]), (settings_page, ["COLOR_COMBO_MIN", "COLOR_COMBO_MAX"]),
+                       (overlay, ["SEPARATOR"])):
+        for n in names:
+            assert not hasattr(mod, n), (mod.__name__, n)
+    assert "start_rgb" not in inspect.signature(color_dialog.CustomColorDialog.__init__).parameters
+    assert "compact_text" not in inspect.signature(controls.ToolButton.__init__).parameters
+    assert "translucent_track" not in inspect.signature(controls.Segmented.__init__).parameters
+    from ui import app as A
+    assert "force" not in inspect.signature(A.App.layout).parameters
+
+
+def test_a8_a9_a10_ruff_clean():
+    import shutil
+    import subprocess
+    ruff = shutil.which("ruff") or str(Path(__import__("sys").executable).with_name("ruff"))
+    if not Path(ruff).exists():
+        pytest.skip("ruff is not installed")
+    r = subprocess.run([ruff, "check", "--no-cache", "--select", "F401,F841,B023,SIM222,RUF034", "core", "ui"],
+                       cwd=ROOT, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout
+    for f in ("core/tinted.py", "ui/pages/export_page.py"):
+        assert "if True:" not in (ROOT / f).read_text(encoding="utf-8"), f
+    assert "if False else" not in (ROOT / "ui/pages/export_page.py").read_text(encoding="utf-8")
+
+
+def test_a13_repository_urls_in_one_place():
+    from core import updater as U, version as V
+    from ui import app as A
+    from ui.pages import settings_page as SP
+    assert V.REPO_URL == "https://github.com/" + V.REPO_SLUG and V.API_LATEST.startswith("https://api.github.com/repos/" + V.REPO_SLUG)
+    assert A.REPO_URL == SP.REPO_URL == V.REPO_URL and U.API_LATEST == V.API_LATEST
+    assert A.LICENSE_URL == SP.LICENSE_URL == V.LICENSE_URL
+    for f in list((ROOT / "core").glob("*.py")) + list((ROOT / "ui").rglob("*.py")):
+        if f.name != "version.py":
+            t = f.read_text(encoding="utf-8")
+            assert "stanislau-salavei/signature-extractor" not in t and "gpl-3.0.html" not in t, f

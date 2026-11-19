@@ -3,7 +3,7 @@ without cutting the signature.
 * candidates: straight thin lines ≥ RULE_MIN_MM (opening with line kernels at ±3° around horizontal / vertical);
 * a candidate is ruling if it runs past the other ink of its band by ≥ RULE_PAST_MM on BOTH ends (ruling crosses
   the signature; a signature's own straight stroke starts or ends inside it — фото 1), or it is a lone line
-  ≥ RULE_LONE_MM with no other ink in its band, or it spans ≥ RULE_SPAN of the photo;
+  ≥ RULE_LONE_MM with no other ink in its band;
 * inside a table (``table=True``) every straight line ≥ RULE_MIN_MM goes;
 * where a stroke crosses the line the pixels stay: only line pixels whose run across the line is no thicker
   than the line itself are removed."""
@@ -17,7 +17,6 @@ log = logging.getLogger(__name__)
 RULE_MIN_MM = 25.0
 RULE_PAST_MM = 5.0
 RULE_LONE_MM = 60.0
-RULE_SPAN = 0.6
 RULE_BAND_MM = 8.0
 RULE_GAP_MM = 1.5
 HEAL_PX = 2

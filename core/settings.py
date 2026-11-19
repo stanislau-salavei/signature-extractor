@@ -30,6 +30,9 @@ def get_app_data_dir() -> Path:
     return target
 
 
+CSIDL_PERSONAL = 5      # «Documents» for SHGetFolderPathW (remark 118, audit A12: a constant, not a comment)
+
+
 def documents_dir() -> Path:
     """User «Documents» folder (Known Folder on Windows, ~/Documents elsewhere)."""
     if sys.platform.startswith("win"):
@@ -38,8 +41,7 @@ def documents_dir() -> Path:
             from ctypes import wintypes
 
             buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
-            # CSIDL_PERSONAL = 5
-            if ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf) == 0 and buf.value:
+            if ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, 0, buf) == 0 and buf.value:
                 return Path(buf.value)
         except Exception:
             log.debug("SHGetFolderPathW failed", exc_info=True)

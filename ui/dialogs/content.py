@@ -9,7 +9,7 @@ from typing import Callable, List, Optional, Sequence, Tuple
 from PIL import Image, ImageTk
 
 from ui import gfx
-from ui.theme import F, S, Scale, Theme, elide, text_width
+from ui.theme import S, Theme, elide, text_width
 from ui.widgets.base import Box, Tooltip
 from ui.widgets.controls import Button, CheckRow, TextBox
 from ui.widgets.overlay import DIALOG_SHADOW, Popup, _paste_clip, grab_window

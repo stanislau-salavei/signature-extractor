@@ -8,10 +8,7 @@ import numpy as np, cv2
 
 PAPER_TINT_C = 20.0      # paper chroma (Lab) from which the paper counts as tinted; white paper ≤ 7, yellow 38–49
 MIN_GAP = 5.0            # the two groups along the tint direction must be this far apart
-SOFT = 3.0               # soft edge of the ink / print decision (Lab units)
 GROW_MM = 0.35
-SEED_AT = 0.35          # seeds: the ink end of the gap
-SEED_MM2 = 0.05
 PIECE_PCT = 30.0
 SPECK_MM2 = 0.3         # tiny ink pieces far from the strokes (stamp dust) go
 SPECK_NEAR_MM = 1.0           # stroke edges are tinted too: keep dark pixels this close to an ink pixel
@@ -101,7 +98,6 @@ def tinted_ink(rgb: np.ndarray, lab: np.ndarray, core: np.ndarray, ppm: float) -
     ids = flat[flat > 0]
     # median of each piece's darker pixels along the tint direction
     order = np.argsort(ids, kind="stable"); ids_s = ids[order]; vals = pr[flat > 0][order]; vals2 = pr2[flat > 0][order]; ls = Lf[flat > 0][order]
-    bounds = np.searchsorted(ids_s, np.arange(1, n + 1))
     med = np.full(n, np.inf, np.float32); med2 = np.full(n, np.inf, np.float32)
     # per piece, vectorised (same numbers as np.percentile, linear interpolation)
     gid = ids_s
@@ -274,67 +270,66 @@ def _morph(img, op, kernel):
 def _on_lines(mask, alpha, alpha_raw, line_px, ppm, removed):
     """The table-line part of clean(), on a crop around the lines."""
     h, w = mask.shape
-    if True:
-        L = max(5, int(round(BAND_MIN_MM * ppm)))   # only long lines (a table border), not a straight stroke
-        Lc = max(5, int(round(10 * ppm)))          # join the line across the strokes that cross it
-        lp8 = line_px.astype(np.uint8)
-        g3 = np.ones((3, 3), np.uint8)
-        band_h = cv2.dilate(_morph(_morph(lp8, cv2.MORPH_CLOSE, np.ones((1, Lc), np.uint8)), cv2.MORPH_OPEN, np.ones((1, L), np.uint8)), g3) > 0
-        band_v = cv2.dilate(_morph(_morph(lp8, cv2.MORPH_CLOSE, np.ones((Lc, 1), np.uint8)), cv2.MORPH_OPEN, np.ones((L, 1), np.uint8)), g3) > 0
-        L5 = max(5, int(round(5 * ppm)))          # gap filling also on shorter (tilted) line pieces, as before
-        gap_h = cv2.dilate(_morph(lp8, cv2.MORPH_OPEN, np.ones((1, L5), np.uint8)), g3) > 0
-        gap_v = cv2.dilate(_morph(lp8, cv2.MORPH_OPEN, np.ones((L5, 1), np.uint8)), g3) > 0
-        if removed is not None and removed.any():      # where the ruling step cut ink, whatever its length
-            rm8 = cv2.dilate(removed.astype(np.uint8), g3); l3 = max(3, int(round(3 * ppm)))
-            rv = _morph(rm8, cv2.MORPH_OPEN, np.ones((l3, 1), np.uint8)) > 0
-            band_v |= rv
-            band_h |= (rm8 > 0) & ~rv & ~band_v
-        band = band_h | band_v
-        gap_h |= band_h; gap_v |= band_v
-        if band.any() or gap_h.any() or gap_v.any():
-            ys_, xs_ = np.nonzero(band) if band.any() else (np.array([0]), np.array([0]))
-            bc = (slice(ys_.min(), ys_.max() + 1), slice(xs_.min(), xs_.max() + 1))
-            t = max(3, _run_median(band_h[bc]), _run_median(band_v[bc].T))      # band thickness (px)
-            k = 2 * (t + BRIDGE_PX) + 1                                   # a 30° slant still spans the band
-            ys, xs = np.nonzero(band | gap_h | gap_v)
-            y0, y1, x0, x1 = max(0, ys.min() - k), min(h, ys.max() + k + 1), max(0, xs.min() - k), min(w, xs.max() + k + 1)
-            if TICKS:     # 73c: on a table line keep only ink of a stroke that crosses it or ends on it
-                # 1) gaps the line cut in a stroke: close along steep slants, only on the line, only dark pixels
-                kg = 2 * (max(3, int(round(0.6 * ppm))) + BRIDGE_PX) + 1
-                sub = mask[y0:y1, x0:x1].astype(np.uint8); addh = np.zeros(sub.shape, bool); addv = np.zeros(sub.shape, bool)
-                for ang in GAP_ANGLES:
-                    for tgt, a_ in ((addh, ang), (addv, ang + 90)):
-                        tgt |= cv2.morphologyEx(sub, cv2.MORPH_CLOSE, _line_kernel(kg, a_)) > 0
-                fill = np.zeros((h, w), bool)
-                fill[y0:y1, x0:x1] = (addh & gap_h[y0:y1, x0:x1]) | (addv & gap_v[y0:y1, x0:x1])
-                fill &= ~mask & (alpha_raw >= 0.5)
-                m1 = mask | fill
-                # 2) every pixel on the line must belong to a stroke that crosses it (rays) or ends on it (reach)
-                base = m1 & ~band
-                cs = (slice(y0, y1), slice(x0, x1))        # all the work happens around the lines
-                keep = np.zeros((h, w), bool)
-                keep[cs] = _crossing(m1[cs], base[cs], band_h[cs], band_v[cs], None, t, k, run=max(4, int(round(CROSS_RUN_MM * ppm))), ppm=ppm)
-                keep &= cv2.morphologyEx((keep | base).astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8)) > 0
-                gone = mask & band & ~keep
-                new = base | keep
-                add = new & ~mask
-                mask = new
+    L = max(5, int(round(BAND_MIN_MM * ppm)))   # only long lines (a table border), not a straight stroke
+    Lc = max(5, int(round(10 * ppm)))          # join the line across the strokes that cross it
+    lp8 = line_px.astype(np.uint8)
+    g3 = np.ones((3, 3), np.uint8)
+    band_h = cv2.dilate(_morph(_morph(lp8, cv2.MORPH_CLOSE, np.ones((1, Lc), np.uint8)), cv2.MORPH_OPEN, np.ones((1, L), np.uint8)), g3) > 0
+    band_v = cv2.dilate(_morph(_morph(lp8, cv2.MORPH_CLOSE, np.ones((Lc, 1), np.uint8)), cv2.MORPH_OPEN, np.ones((L, 1), np.uint8)), g3) > 0
+    L5 = max(5, int(round(5 * ppm)))          # gap filling also on shorter (tilted) line pieces, as before
+    gap_h = cv2.dilate(_morph(lp8, cv2.MORPH_OPEN, np.ones((1, L5), np.uint8)), g3) > 0
+    gap_v = cv2.dilate(_morph(lp8, cv2.MORPH_OPEN, np.ones((L5, 1), np.uint8)), g3) > 0
+    if removed is not None and removed.any():      # where the ruling step cut ink, whatever its length
+        rm8 = cv2.dilate(removed.astype(np.uint8), g3); l3 = max(3, int(round(3 * ppm)))
+        rv = _morph(rm8, cv2.MORPH_OPEN, np.ones((l3, 1), np.uint8)) > 0
+        band_v |= rv
+        band_h |= (rm8 > 0) & ~rv & ~band_v
+    band = band_h | band_v
+    gap_h |= band_h; gap_v |= band_v
+    if band.any() or gap_h.any() or gap_v.any():
+        ys_, xs_ = np.nonzero(band) if band.any() else (np.array([0]), np.array([0]))
+        bc = (slice(ys_.min(), ys_.max() + 1), slice(xs_.min(), xs_.max() + 1))
+        t = max(3, _run_median(band_h[bc]), _run_median(band_v[bc].T))      # band thickness (px)
+        k = 2 * (t + BRIDGE_PX) + 1                                   # a 30° slant still spans the band
+        ys, xs = np.nonzero(band | gap_h | gap_v)
+        y0, y1, x0, x1 = max(0, ys.min() - k), min(h, ys.max() + k + 1), max(0, xs.min() - k), min(w, xs.max() + k + 1)
+        if TICKS:     # 73c: on a table line keep only ink of a stroke that crosses it or ends on it
+            # 1) gaps the line cut in a stroke: close along steep slants, only on the line, only dark pixels
+            kg = 2 * (max(3, int(round(0.6 * ppm))) + BRIDGE_PX) + 1
+            sub = mask[y0:y1, x0:x1].astype(np.uint8); addh = np.zeros(sub.shape, bool); addv = np.zeros(sub.shape, bool)
+            for ang in GAP_ANGLES:
+                for tgt, a_ in ((addh, ang), (addv, ang + 90)):
+                    tgt |= cv2.morphologyEx(sub, cv2.MORPH_CLOSE, _line_kernel(kg, a_)) > 0
+            fill = np.zeros((h, w), bool)
+            fill[y0:y1, x0:x1] = (addh & gap_h[y0:y1, x0:x1]) | (addv & gap_v[y0:y1, x0:x1])
+            fill &= ~mask & (alpha_raw >= 0.5)
+            m1 = mask | fill
+            # 2) every pixel on the line must belong to a stroke that crosses it (rays) or ends on it (reach)
+            base = m1 & ~band
+            cs = (slice(y0, y1), slice(x0, x1))        # all the work happens around the lines
+            keep = np.zeros((h, w), bool)
+            keep[cs] = _crossing(m1[cs], base[cs], band_h[cs], band_v[cs], None, t, k, run=max(4, int(round(CROSS_RUN_MM * ppm))), ppm=ppm)
+            keep &= cv2.morphologyEx((keep | base).astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8)) > 0
+            gone = mask & band & ~keep
+            new = base | keep
+            add = new & ~mask
+            mask = new
+            alpha = np.where(add, np.maximum(alpha, alpha_raw), alpha)
+            if gone.any():
+                fr = (cv2.dilate(gone.astype(np.uint8), g3) > 0) & ~mask
+                alpha = np.where(gone | fr, 0.0, alpha)
+        else:
+            base = mask
+            sub = base[y0:y1, x0:x1].astype(np.uint8); addh = np.zeros(sub.shape, bool); addv = np.zeros(sub.shape, bool)
+            for ang in BRIDGE_ANGLES:
+                for tgt, a_ in ((addh, ang), (addv, ang + 90)):
+                    tgt |= cv2.morphologyEx(sub, cv2.MORPH_CLOSE, _line_kernel(k, a_)) > 0
+            add = np.zeros((h, w), bool)
+            add[y0:y1, x0:x1] = (addh & band_h[y0:y1, x0:x1]) | (addv & band_v[y0:y1, x0:x1])
+            add &= ~base & (alpha_raw >= 0.5)
+            if add.any():
+                mask = mask | add
                 alpha = np.where(add, np.maximum(alpha, alpha_raw), alpha)
-                if gone.any():
-                    fr = (cv2.dilate(gone.astype(np.uint8), g3) > 0) & ~mask
-                    alpha = np.where(gone | fr, 0.0, alpha)
-            else:
-                base = mask
-                sub = base[y0:y1, x0:x1].astype(np.uint8); addh = np.zeros(sub.shape, bool); addv = np.zeros(sub.shape, bool)
-                for ang in BRIDGE_ANGLES:
-                    for tgt, a_ in ((addh, ang), (addv, ang + 90)):
-                        tgt |= cv2.morphologyEx(sub, cv2.MORPH_CLOSE, _line_kernel(k, a_)) > 0
-                add = np.zeros((h, w), bool)
-                add[y0:y1, x0:x1] = (addh & band_h[y0:y1, x0:x1]) | (addv & band_v[y0:y1, x0:x1])
-                add &= ~base & (alpha_raw >= 0.5)
-                if add.any():
-                    mask = mask | add
-                    alpha = np.where(add, np.maximum(alpha, alpha_raw), alpha)
     return mask, alpha
 
 

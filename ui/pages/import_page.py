@@ -1,10 +1,9 @@
 """Screen 1 (01, 02, 03, 45, 55): Quick-Share-like drop zone, tips card, processing state."""
 from __future__ import annotations
 
-import math
 
 from ui import gfx
-from ui.theme import F, S, Theme, text_width
+from ui.theme import F, S, Theme
 from ui.widgets.base import Box
 from ui.widgets.controls import Button, Link
 
@@ -85,7 +84,7 @@ class DropZone(Box):
                       anchor="center")
             return
         top = self._inner_top()
-        self.rrect(w / 2 - 42, top, 84, 84, 8, "accent_soft_drop" if not over else "accent_soft_drop", bg=fill)
+        self.rrect(w / 2 - 42, top, 84, 84, 8, "accent_soft_drop", bg=fill)
         self.icon("upload", w / 2 - 20, top + 22, 40, "accent")
         title = self.app.t("import.drop_release" if over else "import.drop_title")
         self.text(w / 2, top + 84 + 6 + 16 + 14.5, title, 24, "semibold", anchor="center")
@@ -145,7 +144,7 @@ class ErrorBar(Box):
 
     def draw(self):
         w, h = self.lw, self.lh
-        self.rrect(0, 0, w, h, 4, "error_bg", Theme.c("error_stroke") if False else "error_stroke")
+        self.rrect(0, 0, w, h, 4, "error_bg", "error_stroke")
         bg = Theme.c("error_bg")
         self.put_cached(17, 14, ("err", Theme.c("error_icon"), bg), lambda: _err_icon(Theme.c("error_icon"), bg))
         self.text(49, 15.5 + 8.45, self.message, 13, "semibold")

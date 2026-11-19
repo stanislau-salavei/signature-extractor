@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Callable, List
 
 from ui import gfx
-from ui.theme import S, Scale, Theme, text_width
+from ui.theme import Scale, Theme, text_width
 from ui.widgets.base import Box, Control
 from ui.widgets.controls import IconButton
 

@@ -18,9 +18,9 @@ from ui.widgets.scroll import ScrollArea
 
 log = logging.getLogger(__name__)
 
-W, SCROLL_H, FOOT_H = 718, 518, 64      # W = content width (panel 720); SCROLL_H = max text area height
+W, SCROLL_H = 718, 518                  # W = content width (panel 720); SCROLL_H = max text area height
 TITLE_H = 24 + 25 + 12                   # body padding + title line + gap above the text
-PAD_L, PAD_R, PAD_T, PAD_B = 24, 28, 8, 36
+PAD_L, PAD_R, PAD_T = 24, 28, 8
 TEXT_W = W - PAD_L - PAD_R
 LH = 19.5
 TILE = {"PNG": (("#0F7B0F", "#E7F5EA"), ("#6CCB5F", "#1E3A23")),

@@ -8,10 +8,10 @@ from __future__ import annotations
 import logging
 import colorsys
 import math
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from core import export as ex
 from ui import gfx
@@ -23,7 +23,6 @@ from ui.widgets.controls import TextBox
 log = logging.getLogger(__name__)
 
 W, H = 418, 500
-BOARD_H = 436              # the picker area (title and footer are drawn by ContentDialog)
 DLG_W = 428                # panel: 1 + 4 + board (20 … 398) + 25
 BOARD_DY = 24 + 25 + 16 - 18   # board y inside the panel: its first row (y 18) starts under the title
 PAPER = {"light": "#EFECE3", "dark": "#3A3830"}
@@ -118,7 +117,7 @@ class _Board(Box):
 
 
 class CustomColorDialog(ContentDialog):
-    def __init__(self, app, mask, start_rgb: Optional[Tuple[int, int, int]], done: Callable[[str, str], None],
+    def __init__(self, app, mask, done: Callable[[str, str], None],
                  edit: Optional[dict] = None):
         """``edit`` = a saved own colour {id, name, hex} → remark 47 «Изменить цвет»: the dialog opens with its
         colour and name, the button is «Сохранить»."""

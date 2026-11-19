@@ -8,9 +8,9 @@ from typing import List, Optional
 from core import processing as P
 from ui import gfx
 from ui.pages.preview import Preview
-from ui.theme import S, Theme, elide, text_width
+from ui.theme import S, Theme, elide
 from ui.widgets.scroll import ScrollArea
-from ui.widgets.base import Box, Control
+from ui.widgets.base import Box
 from ui.widgets.batch import STRIP_H, InfoBar, PhotoStrip
 from ui.widgets.controls import Button, Link, IconButton, Segmented, Slider, Toggle, ToolButton
 
@@ -274,7 +274,6 @@ class _Swatch(Box):
 
     def draw(self):
         if self.round:
-            st = gfx.rgba("#000000", 0.26)
             self.put_cached(0, 6, ("inks", self.color, Theme.mode),
                             lambda: gfx.circle(20, self.color, "#424242" if not Theme.dark() else "#5A5A5A"))
             self.text(30, 16, self.caption, 13)

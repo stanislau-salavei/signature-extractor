@@ -42,7 +42,6 @@ log = logging.getLogger(__name__)
 MM_PER_INCH = 25.4
 FALLBACK_DPI = 300.0
 DEFAULT_MARGIN_MM = 0.5          # «Поле рамки» default, all size modes
-CELL_PADDING_MM = DEFAULT_MARGIN_MM   # kept for older callers
 MIN_STROKE_MM = 0.0              # SVG/DXF: no thickening of thin strokes (remark 8)
 DEFAULT_DXF_LINE_MM = 0.18       # DXF centreline thickness (remark 9)
 SVG_MODES = ("original", "stroke")     # remark 22: «Как в оригинале» | «Заданная толщина»

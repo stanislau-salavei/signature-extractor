@@ -7,30 +7,28 @@ import subprocess
 import sys
 import tkinter as tk
 import webbrowser
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog
-from typing import List, Optional, Sequence
+from typing import List, Sequence
 
 import customtkinter as ctk
 
 from core import processing as P
-from core.history import HistoryStack
 from core.i18n import I18n
 from core.settings import SettingsManager
 from core.state import AppState
 from core.worker import BackgroundWorker
 from ui import gfx, platform_win
-from ui.theme import Fonts, S, Scale, Theme
+from ui.theme import Fonts, Scale, Theme
 from ui.widgets.base import Registry, Tooltip
 from ui.widgets.overlay import MenuItem, MenuPopup, Popup, TooltipLayer, widget_rect
 
 log = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-REPO_URL = "https://github.com/stanislau-salavei/signature-extractor"
-LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
-from core.version import RELEASE_TAG, VERSION   # noqa: E402  remark 84: release v1.0, Git tag v1.0 (not v1.0.0)
+# remark 84: Git tag v1.0 (not v1.0.0); RELEASE_TAG, REPO_URL, LICENSE_URL are used as A.* (about dialog, tests)
+from core.version import LICENSE_URL, RELEASE_TAG, REPO_URL, VERSION   # noqa: E402, F401
 CLIENT_W, CLIENT_H = 1280, 768      # 1280 × 800 together with the 32 px title bar (mockups)
 MIN_W, MIN_H = 1024, 648            # 1024 × 680 window
 
@@ -213,15 +211,15 @@ class App:
             Popup.close_current()
             Registry.refresh_all()
             self.update_header()
-            self.layout(force=True)
+            self.layout()
 
-    def _on_scaling(self, widget_scaling, window_scaling):
+    def _on_scaling(self, widget_scaling, _window_scaling):   # CustomTkinter ScalingTracker callback
         Scale.factor = widget_scaling
         Fonts.clear()
         gfx.clear_cache()
         Popup.close_current()
         Registry.refresh_all()
-        self.layout(force=True)
+        self.layout()
 
     # ------------------------------------------------------------------ window size (remark 92)
     def _window_scale(self) -> float:
@@ -310,7 +308,7 @@ class App:
             Popup.close_current()
             self.layout()
 
-    def layout(self, force=False):
+    def layout(self):
         w, h = self.width(), self.height()
         if self.settings_open and self.settings_page:
             self.settings_page.layout(w, h)
@@ -332,7 +330,6 @@ class App:
 
     def update_header(self):
         labels = [self.t("shell.step.import"), self.t("shell.step.process"), self.t("shell.step.export")]
-        has_result = self.job is not None and self.job.result is not None
         can_export = self.can_export()
         if self.page in ("import",):
             active, done, enabled = 0, set(), {0}

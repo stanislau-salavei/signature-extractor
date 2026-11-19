@@ -103,7 +103,7 @@ def rrect(w: float, h: float, r: float, fill: Optional[str], stroke: Optional[st
                 im.alpha_composite(Image.composite(col, Image.new("RGBA", big, (0, 0, 0, 0)), m))
             else:
                 im.paste(col, (0, 0), m)
-        elif bg is not None or True:
+        else:
             m, _ = layer(inner, max(0, R - sw), (0, 0, 0, 0))
             im.paste(Image.new("RGBA", big, base), (0, 0), m)
     elif fill:
@@ -269,7 +269,7 @@ def dashed_rrect(w: float, h: float, r: float, color: str, width: float = 1.5, d
     pts.append((x0, y0 + R)); arc(x0 + R, y0 + R, 180, 270)
     # walk the path
     seg_on, seg_off = dash * k, gap * k
-    pos, on, remain = 0.0, True, seg_on
+    on, remain = True, seg_on
     col = rgba(color)
     cur = [pts[0]]
     for (ax, ay), (bx, by) in zip(pts, pts[1:]):

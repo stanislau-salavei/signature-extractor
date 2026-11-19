@@ -6,10 +6,10 @@ import logging
 import sys
 from pathlib import Path
 from tkinter import filedialog
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw
 
 from core import batch as B
 from core import export as ex
@@ -175,7 +175,6 @@ class Swatch(Control):
     def draw(self):
         sel = self.key == self.page.color_key
         bgc = Theme.c("card")
-        cx = cy = 16  # widget 32×32, circle 28 centred
         if sel:
             self.put_cached(0, 0, ("swr", Theme.mode), lambda: gfx.circle(32, Theme.c("accent"), bg=bgc))
             self.put_cached(2, 2, ("swr2", Theme.mode), lambda: gfx.circle(28, bgc, bg=None))
@@ -354,8 +353,7 @@ class FormatCard(Card):
         on = p.formats[self.code]
         fg, bgc = TILE[self.code][1 if Theme.dark() else 0]
         self.put_cached(17, 15, ("tile", self.code, Theme.mode), lambda: gfx.rrect(32, 32, 4, bgc))
-        self.text(33, 31, self.code, 11, "bold", color=fg, anchor="center") if False else \
-            self.create_text(S(33), S(31), text=self.code, font=F(11, "bold"), fill=fg)
+        self.create_text(S(33), S(31), text=self.code, font=F(11, "bold"), fill=fg)
         self.text(61, 22.5, self.code, 13.5, "semibold", color="text" if on else "muted")
         avail = (self.lw - 15 - 20 - 12 - 40 if self.chev else self.lw - 15 - 40) - 12 - 61
         self.text(61, 40, elide(t(self.desc_key), avail, 12), 12, color="muted")
@@ -565,17 +563,16 @@ class _PreviewBox(Box):
             acc_c = gfx.rgba(Theme.c("accent"))
             d = ImageDraw.Draw(img)
             # dashed file / box outline in every mode, so «Поле рамки» is visible in «Как в исходнике» too
-            if True:
-                x0, y0, x1, y1 = ox * kd, oy * kd, (ox + ow) * kd, (oy + oh) * kd
-                step, gap = 3 * kd, 2 * kd
-                for (ax, ay, bx, by) in ((x0, y0, x1, y0), (x1, y0, x1, y1), (x0, y1, x1, y1), (x0, y0, x0, y1)):
-                    L = max(abs(bx - ax), abs(by - ay))
-                    tpos = 0.0
-                    while tpos < L:
-                        t2 = min(L, tpos + step)
-                        d.line((ax + (bx - ax) * tpos / L, ay + (by - ay) * tpos / L,
-                                ax + (bx - ax) * t2 / L, ay + (by - ay) * t2 / L), fill=acc_c, width=max(1, round(kd)))
-                        tpos = t2 + gap
+            x0, y0, x1, y1 = ox * kd, oy * kd, (ox + ow) * kd, (oy + oh) * kd
+            step, gap = 3 * kd, 2 * kd
+            for (ax, ay, bx, by) in ((x0, y0, x1, y0), (x1, y0, x1, y1), (x0, y1, x1, y1), (x0, y0, x0, y1)):
+                L = max(abs(bx - ax), abs(by - ay))
+                tpos = 0.0
+                while tpos < L:
+                    t2 = min(L, tpos + step)
+                    d.line((ax + (bx - ax) * tpos / L, ay + (by - ay) * tpos / L,
+                            ax + (bx - ax) * t2 / L, ay + (by - ay) * t2 / L), fill=acc_c, width=max(1, round(kd)))
+                    tpos = t2 + gap
             if geom.box_mm:
                 size = p.size_choice()
                 cap = app.t("export.cell_caption") if size.is_cell_15x5 else p.wxh(*geom.box_mm)
@@ -1078,7 +1075,7 @@ class ExportPage(Box):
             self.color_key = ex.CUSTOM_COLOR_PREFIX + cid
             self.c_color.rebuild()
             self.changed()
-        CustomColorDialog(self.app, self.source.mask if self.source else None, self.current_rgb(), done)
+        CustomColorDialog(self.app, self.source.mask if self.source else None, done)
 
     def toggle_format(self, code, on):
         self.formats[code] = on

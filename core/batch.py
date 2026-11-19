@@ -16,7 +16,7 @@ import logging
 import os
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 from PIL import Image
 

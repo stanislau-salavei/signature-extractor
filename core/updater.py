@@ -25,7 +25,7 @@ from typing import Callable, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
-API_LATEST = "https://api.github.com/repos/stanislau-salavei/signature-extractor/releases/latest"
+from core.version import API_LATEST  # noqa: E402  remark 118 (A13): the repository is written in core/version.py
 API_ENV = "SE_UPDATE_API"         # stage 6 (D7): «…/repos/<owner>/<test-repo>/releases/latest» for testing updates
 
 

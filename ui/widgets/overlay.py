@@ -16,8 +16,8 @@ from typing import Callable, List, Optional, Sequence, Tuple
 from PIL import Image, ImageGrab, ImageTk
 
 from ui import gfx
-from ui.theme import F, S, Scale, Theme, elide, rgb, text_width
-from ui.widgets.base import Box, Tooltip
+from ui.theme import F, S, Scale, Theme, elide, text_width
+from ui.widgets.base import Tooltip
 
 log = logging.getLogger(__name__)
 
@@ -191,8 +191,6 @@ class MenuItem:
                  disabled: bool = False):
         self.text, self.command, self.icon, self.disabled = text, command, icon, disabled
 
-
-SEPARATOR = None
 
 
 class MenuPopup(Popup):

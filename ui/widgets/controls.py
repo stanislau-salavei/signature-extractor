@@ -10,7 +10,7 @@ from typing import Callable, List, Optional, Sequence
 
 from ui import gfx
 from ui.theme import F, S, Scale, Theme, elide, text_width
-from ui.widgets.base import Box, Control, Tooltip
+from ui.widgets.base import Box, Control
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class ToolButton(Control):
     """Toolbar button (32 high, radius 4, text 12.5, icon 16, padding 0 11); ``on`` = selected tool."""
 
     def __init__(self, master, text: str = "", icon: Optional[str] = None, bg: str = "card", command=None,
-                 tooltip=None, compact_text: bool = False):
+                 tooltip=None):
         super().__init__(master, bg=bg, command=command, tooltip=tooltip)
         self.label, self.icon_name, self.on = text, icon, False
         self.icon_only = False
@@ -685,8 +685,7 @@ class Segmented(Control):
 
     def __init__(self, master, labels: Sequence[str], index: int = 0, bg: str = "card",
                  command: Optional[Callable[[int], None]] = None, font_px: float = 11.5,
-                 equal: bool = True, track: str = "seg_track", seg_pad=(8, 8), text_dy: float = -2,
-                 translucent_track: bool = False):
+                 equal: bool = True, track: str = "seg_track", seg_pad=(8, 8), text_dy: float = -2):
         super().__init__(master, bg=bg)
         self.labels, self.index = list(labels), index
         self.on_select = command

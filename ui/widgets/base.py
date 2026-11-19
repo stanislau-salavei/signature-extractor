@@ -9,7 +9,7 @@ from typing import Callable, Optional
 from PIL import Image, ImageTk
 
 from ui import gfx
-from ui.theme import F, S, Scale, Theme
+from ui.theme import F, S, Theme
 
 log = logging.getLogger(__name__)
 

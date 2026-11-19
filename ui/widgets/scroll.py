@@ -8,7 +8,7 @@ from typing import Callable
 
 from ui import gfx
 from ui.theme import S, Scale, Theme, blend
-from ui.widgets.base import Box, Control
+from ui.widgets.base import Control
 
 log = logging.getLogger(__name__)
 
