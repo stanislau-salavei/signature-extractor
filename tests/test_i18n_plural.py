@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from core.i18n import I18n, ru_plural_category
+from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 CSV = Path(__file__).resolve().parents[1] / "i18n" / "strings_ru_en.csv"
 
@@ -51,4 +52,4 @@ def test_project_csv_matches_prompt_csv():
     prompt = Path("/workspace/prompt/v2/i18n/strings_ru_en.csv")
     if not prompt.exists():
         pytest.skip("prompt table not available")
-    assert prompt.read_bytes() == CSV.read_bytes()
+    assert_matches_prompt(CSV, prompt)         # remarks 77–85: approved differences only

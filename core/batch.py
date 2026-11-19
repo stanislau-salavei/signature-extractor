@@ -168,6 +168,7 @@ def path_key(p: Path) -> str:
     try:
         return os.path.normcase(os.path.abspath(str(p)))
     except Exception:
+        log.debug("path_key: Exception caught", exc_info=True)   # remark 81
         return str(p)
 
 
@@ -413,7 +414,7 @@ class SaveSession:
         return self.done >= self.total
 
 
-def process_job(job: Job, state: EditState, photo: Optional[P.Photo], ai_alpha_fn=None):
+def process_job(job: Job, state: EditState, photo: Optional[P.Photo]):
     """Worker-thread body: load the photo when needed and run the pipeline for ``state``.
     Returns (photo, result, thumbnail or None)."""
     if photo is None:
@@ -421,7 +422,6 @@ def process_job(job: Job, state: EditState, photo: Optional[P.Photo], ai_alpha_f
             raise P.ImageLoadError(job.name)
         img, dpi = P.load_image(job.path)
         photo = P.prepare_photo(img, dpi, job.path.name)
-    ai = ai_alpha_fn(photo, state.params) if ai_alpha_fn else None
-    res = P.process(photo, state.params, state.frame, state.eraser, ai)
+    res = P.process(photo, state.params, state.frame, state.eraser)
     thumb = make_thumbnail(photo, res)
     return photo, res, thumb

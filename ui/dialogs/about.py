@@ -49,7 +49,7 @@ class AboutDialog(ContentDialog):
         meta.lift()
         self.widgets.append(meta)
         links = [(t("settings.source_code"), A.REPO_URL, 0, 78),
-                 (t("settings.release_notes"), f"{A.REPO_URL}/releases/tag/v{app.VERSION_STR}", 0, 108.1),
+                 (t("settings.release_notes"), f"{A.REPO_URL}/releases/tag/{A.RELEASE_TAG}", 0, 108.1),
                  ("GNU GPLv3", A.LICENSE_URL, text_width(t("settings.license"), 12.5) + 5.6, 138.2)]
         for label, url, lx, ly in links:
             lk = Link(self.root, label, 14, "link", bg="dialog", command=lambda u=url: app.open_url(u))

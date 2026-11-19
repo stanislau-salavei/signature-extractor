@@ -255,7 +255,7 @@ class Preview(Box):
         iw, ih = photo.size
 
         def work():
-            return P.process(photo, st.params, (0, 0, iw, ih), st.eraser, app._ai_alpha(photo, st.params))
+            return P.process(photo, st.params, (0, 0, iw, ih), st.eraser)
 
         def done(res):
             if self._live_req == key:
@@ -644,6 +644,7 @@ class Preview(Box):
         try:
             self.configure(cursor=cur)
         except Exception:
+            log.debug("Preview._update_cursor: Exception caught", exc_info=True)   # remark 81
             self.configure(cursor="")
 
     # ------------------------------------------------------------------ events

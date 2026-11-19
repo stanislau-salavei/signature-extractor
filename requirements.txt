@@ -11,6 +11,3 @@ potracer>=0.0.4          # SVG/DXF tracing (GPL, compatible with GPLv3)
 ezdxf>=1.1.0             # DXF R2010 writer (MIT)
 # Tests
 pytest>=7.0
-# Optional AI (IS-Net); the model must be bundled. On Windows: onnxruntime-directml.
-# onnxruntime>=1.16.0
-# onnxruntime-directml>=1.16.0

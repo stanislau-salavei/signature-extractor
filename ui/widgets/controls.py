@@ -363,7 +363,7 @@ class ComboBox(Control):
         try:
             self.redraw()
         except tk.TclError:
-            pass
+            log.debug("ComboBox._closed: tk.TclError caught", exc_info=True)   # remark 81
 
     def _picked(self, i):
         self.index = i
@@ -497,7 +497,7 @@ class TextBox(Box):
                 self.focused = False
                 self.redraw()
         except (tk.TclError, KeyError):
-            pass
+            log.debug("TextBox._check_focus: (tk.TclError, KeyError) caught", exc_info=True)   # remark 81
 
     def _validate(self, proposed: str) -> bool:
         if self.allow is None:
@@ -560,7 +560,7 @@ class TextBox(Box):
         try:
             self.winfo_toplevel().focus_set()
         except Exception:
-            pass
+            log.warning("TextBox._esc: Exception caught", exc_info=True)   # remark 81
         return "break"
 
     def _focus_in(self, _e=None):

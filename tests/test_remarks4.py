@@ -113,7 +113,7 @@ def test_process_and_batch_sections_have_headings():
     app = fake_app(lang=2)
     assert fh.card_titles(fh.generic_blocks(app, "process")) == [
         "Рамка области", "Ластик", "Выравнивание фона", "Фильтр по цвету чернил",
-        "AI-поиск подписи", "Тонкая настройка", "Фон предпросмотра"]
+        "Тонкая настройка", "Фон предпросмотра"]                        # remark 78: no «AI-поиск подписи»
     assert fh.card_titles(fh.generic_blocks(app, "batch")) == [
         "Лента фото", "Настройки для всех фото", "Требуют внимания", "Добавить и убрать", "Сохранение"]
     for tp in ("start", "prep", "process", "batch"):

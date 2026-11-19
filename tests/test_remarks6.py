@@ -12,6 +12,7 @@ import pytest
 
 from core import export as ex
 from core import processing as P
+from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
@@ -131,13 +132,13 @@ def test_apply_all_body_plurals():
     from core.i18n import I18n
     ru, en = I18n(CSV, "ru"), I18n(CSV, "en")
     assert ru.tn("dialog.apply_all.body", 5) == ("Настройки панели этого фото будут применены к остальным 5 фото "
-                                                 "пакета. Рамка обрезки и ластик не изменятся.")
+                                                 "пакета. Рамка обрезки и ластик не изменятся")   # remark 85: no period
     assert "the other photo " in en.tn("dialog.apply_all.body", 1) and "other 5 photos " in en.tn("dialog.apply_all.body", 5)
 
 
 @pytest.mark.skipif(not PROMPT_CSV.exists(), reason="prompt CSV not on this machine")
 def test_csv_matches_prompt_copy():
-    assert CSV.read_bytes() == PROMPT_CSV.read_bytes()
+    assert_matches_prompt(CSV, PROMPT_CSV)     # remarks 77–85: approved differences only
 
 
 # ------------------------------------------------------------------ 41 / 42 / 44: help cards

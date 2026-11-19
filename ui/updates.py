@@ -50,6 +50,7 @@ class UpdateController:
                 res = fn()
                 self._q.put((done, res, None))
             except BaseException as exc:   # noqa: BLE001
+                log.debug("UpdateController._run.work: BaseException caught", exc_info=True)   # remark 81
                 self._q.put((done, None, exc))
         threading.Thread(target=work, name="updater", daemon=True).start()
         if not self._polling:
@@ -69,6 +70,7 @@ class UpdateController:
         try:
             self.app.root.after(self.POLL_MS, self._poll)
         except Exception:
+            log.debug("UpdateController._poll: Exception caught", exc_info=True)   # remark 81
             self._polling = False
 
     # ------------------------------------------------------------------ checks

@@ -112,7 +112,7 @@ def test_apply_to_all_copies_panel_settings_one_step_per_photo():
     src = bt.items[0]
     other = bt.items[1]
     other.push(B.EditState(other.state.params, (1, 2, 30, 40), (("stroke",),)))
-    params = P.ProcessParams(flatten=False, ink_mode="manual", ink_rgb=(10, 20, 30), ai=True, sensitivity=70)
+    params = P.ProcessParams(flatten=False, ink_mode="manual", ink_rgb=(10, 20, 30), denoise=40, sensitivity=70)
     src.push(B.EditState(params, None, ()))
     changed = bt.apply_params_to_all(params, source=src)
     assert changed == bt.items[1:]
@@ -310,7 +310,7 @@ def test_ui_folder_opens_batch_and_flags_attention(app, folder):
     assert len(loaded) <= B.LOADED_MAX                                  # memory: only recent photos kept
     app.show_next_attention()
     pump(app, until=lambda: app.job.loaded)
-    assert app.job.status == "attention" and pp.reason.visible
+    assert app.job.status == "attention" and pp.warn_bar.msg == app.t("batch.reason_not_found")   # remark 89
 
 
 def test_ui_arrows_switch_photos_and_remove(app, folder):

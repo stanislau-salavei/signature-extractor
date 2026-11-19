@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw
 from core import batch as B
 from core import export as ex
 from core import processing as P
+from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
@@ -278,7 +279,7 @@ def test_r48_clean_photoshop_pngs_pass_and_photos_with_stamps_are_marked():
 def test_r46_58_i18n_rows_and_csv_identity():
     r = rows()
     assert len(r) >= 340          # remark 59–71 added rows (test_remarks8)
-    assert CSV.read_bytes() == PROMPT_CSV.read_bytes()
+    assert_matches_prompt(CSV, PROMPT_CSV)     # remarks 77–85: approved differences only
     assert r["settings.add_color"][2:4] == ["Добавить цвет", "Add color"]
     assert r["settings.delete_color.title"][2:4] == ["Удалить цвет «{name}»?", "Delete color “{name}”?"]
     assert r["settings.delete_color.default_note"][2] == "По умолчанию станет {name}"

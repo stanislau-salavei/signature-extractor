@@ -1,71 +1,276 @@
-"""Scrollable viewport with a Notepad-like overlay scrollbar (thin 2 px line, 6 px on hover)."""
+"""Scrollable viewport with a Notepad-like overlay scrollbar (remark 79: Windows 11 behaviour)."""
 from __future__ import annotations
 
+import logging
 import sys
 import tkinter as tk
 from typing import Callable
 
-from ui.theme import S, Scale, Theme
+from ui import gfx
+from ui.theme import S, Scale, Theme, blend
 from ui.widgets.base import Box, Control
+
+log = logging.getLogger(__name__)
+
+
+# Remark 79: the Windows 11 / Notepad overlay scrollbar (stage_0_common «Полоса прокрутки»).
+# At rest a rounded 2 px line 4 px from the right edge, no arrows, no track.  When the pointer is over the bar
+# zone it widens smoothly (EXPAND_MS) to a 6 px thumb with small arrows at both ends and a faint track; about
+# 1 s (COLLAPSE_DELAY_MS) after the pointer leaves it narrows back the same way.  Sizes as in Notepad
+# (/workspace/feedback/scroll_notepad_*.png): track 12 px, thumb 6 px, arrows 8 × 6 px in the thumb colour.
+ZONE_W = 12.0
+REST_W, WIDE_W = 2.0, 6.0          # thumb width at rest / widened
+REST_GAP, WIDE_GAP = 4.0, 3.0      # thumb gap to the right edge
+END, ARROW_ZONE = 4.0, 18.0        # thumb travel margin at rest / with the arrows shown
+TRACK_PAD = 2.0                    # track inset at the top and bottom
+ARROW_W, ARROW_H, ARROW_TOP = 8.0, 6.0, 7.0
+EXPAND_MS, STEPS = 120, 6
+COLLAPSE_DELAY_MS = 1000
+STEP_PX = 48.0                     # one arrow click = one wheel notch
+REPEAT_FIRST_MS, REPEAT_MS = 400, 50
+
+
+def bar_geometry(right: float, top: float, height: float, t: float, view: float, content: float, scroll: float,
+                 rest_gap: float = REST_GAP, wide_gap: float = WIDE_GAP):
+    """Track, thumb and arrows of a vertical bar whose zone ends at ``right`` (logical px, ``t`` = widening)."""
+    if content <= view or height <= 0:
+        return None
+    m = END + (ARROW_ZONE - END) * t
+    track_len = height - 2 * m
+    if track_len <= 0:
+        return None
+    th = max(24.0, track_len * view / content)
+    rng = content - view
+    ty = top + m + (track_len - th) * (scroll / rng)
+    w = REST_W + (WIDE_W - REST_W) * t
+    gap = rest_gap + (wide_gap - rest_gap) * t
+    cx = right - ZONE_W / 2
+    return {
+        "thumb": (right - gap - w, ty, w, th),
+        "track": (right - ZONE_W, top + TRACK_PAD, ZONE_W, height - 2 * TRACK_PAD),
+        "up": (cx - ARROW_W / 2, top + ARROW_TOP, ARROW_W, ARROW_H),
+        "down": (cx - ARROW_W / 2, top + height - ARROW_TOP - ARROW_H, ARROW_W, ARROW_H),
+        "travel": track_len - th,
+        "arrows": t >= 0.5,
+    }
+
+
+def _tr(r):
+    x, y, w, h = r
+    return (y, x, h, w)
+
+
+def hbar_geometry(bottom: float, left: float, width: float, t: float, view: float, content: float, scroll: float,
+                  rest_gap: float = REST_GAP, wide_gap: float = WIDE_GAP):
+    """Remark 86: the same bar lying on its side (the photo strip): the zone ends at ``bottom``, the arrows are
+    «left» / «right».  Rects are (x, y, w, h) in the horizontal frame."""
+    g = bar_geometry(bottom, left, width, t, view, content, scroll, rest_gap, wide_gap)
+    if g is None:
+        return None
+    return {"thumb": _tr(g["thumb"]), "track": _tr(g["track"]), "left": _tr(g["up"]), "right": _tr(g["down"]),
+            "travel": g["travel"], "arrows": g["arrows"], "horizontal": True}
+
+
+def hbar_zone(g, x: float, left: float, width: float) -> str:
+    """Which part of a horizontal bar is under ``x``: left | right | thumb | track."""
+    if g["arrows"]:
+        if x < left + ARROW_ZONE:
+            return "left"
+        if x > left + width - ARROW_ZONE:
+            return "right"
+    tx, _, tw, _ = g["thumb"]
+    return "thumb" if tx <= x <= tx + tw else "track"
+
+
+def bar_zone(g, y: float, top: float, height: float) -> str:
+    """Which part of the bar is under ``y``: up | down | thumb | track."""
+    if g["arrows"]:
+        if y < top + ARROW_ZONE:
+            return "up"
+        if y > top + height - ARROW_ZONE:
+            return "down"
+    _, ty, _, th = g["thumb"]
+    return "thumb" if ty <= y <= ty + th else "track"
+
+
+def draw_bar(box, g, t: float, under: str, put) -> None:
+    """Paint ``g`` (bar_geometry) on ``box``: ``put(x, y, key, factory)`` places a cached image; ``under`` is
+    the colour below the bar."""
+    horizontal = g.get("horizontal", False)
+    if t > 0:
+        track = blend(Theme.c("scroll_track"), t, under)
+        x, y, w, h = g["track"]
+        put(x, y, ("sb_track", round(w, 2), round(h, 2), track, under),
+            lambda: gfx.rrect(w, h, min(w, h) / 2, track, bg=under))
+        if g["arrows"]:
+            col = blend(Theme.c("scroll_thumb"), min(1.0, (t - 0.5) * 2), track)
+            for name in (("left", "right") if horizontal else ("up", "down")):
+                ax, ay, aw, ah = g[name]
+                if horizontal:      # the 8 × 6 arrow turned on its side (6 × 8), pointing left / right
+                    put(ax, ay, ("sb_arrow", name, col, track),
+                        lambda name=name: gfx.triangle(ah, aw, col, track, True).rotate(
+                            90 if name == "left" else -90, expand=True))
+                else:
+                    put(ax, ay, ("sb_arrow", name, col, track),
+                        lambda name=name: gfx.triangle(aw, ah, col, track, name == "up"))
+        under = track
+    x, y, w, h = g["thumb"]
+    thumb = Theme.c("scroll_thumb")
+    put(x, y, ("sb_thumb", round(w, 2), round(h, 2), thumb, under),
+        lambda: gfx.rrect(w, h, min(w, h) / 2, thumb, bg=under))
+
+
+class Widening:
+    """The smooth 2 → 6 px animation with the 1 s delay before narrowing (shared by the bars)."""
+
+    def __init__(self, widget, redraw: Callable[[], None], busy: Callable[[], bool]):
+        self.widget = widget
+        self.redraw = redraw
+        self.busy = busy           # True while the pointer is on the bar or the thumb is dragged
+        self.t = 0.0
+        self.target = 0.0
+        self._anim = self._delay = None
+
+    def _cancel(self, attr):
+        job = getattr(self, attr)
+        if job is not None:
+            try:
+                self.widget.after_cancel(job)
+            except tk.TclError:
+                log.debug("after_cancel failed", exc_info=True)
+            setattr(self, attr, None)
+
+    def expand(self):
+        self._cancel("_delay")
+        self._go(1.0)
+
+    def collapse_later(self):
+        self._cancel("_delay")
+        self._delay = self.widget.after(COLLAPSE_DELAY_MS, self._collapse_now)
+
+    def _collapse_now(self):
+        self._delay = None
+        if not self.busy():
+            self._go(0.0)
+
+    def _go(self, target: float):
+        self.target = target
+        if self._anim is None and abs(self.t - target) > 1e-6:
+            self._anim = self.widget.after(EXPAND_MS // STEPS, self._tick)
+
+    def _tick(self):
+        self._anim = None
+        step = 1.0 / STEPS
+        self.t = min(self.target, self.t + step) if self.t < self.target else max(self.target, self.t - step)
+        if abs(self.t - self.target) < 1e-3:
+            self.t = self.target
+        self.redraw()
+        if abs(self.t - self.target) > 1e-6:
+            self._anim = self.widget.after(EXPAND_MS // STEPS, self._tick)
+
+    def stop(self):
+        self._cancel("_anim")
+        self._cancel("_delay")
 
 
 class ScrollBar(Control):
-    W = 12
+    """Overlay bar of a ScrollArea (Параметры, справка, экран 2, экран 3, окно 21): drag the thumb, click the
+    track to page, the arrows step (and repeat while held), the wheel works over the whole page."""
+    W = ZONE_W
 
     def __init__(self, master, area: "ScrollArea"):
         super().__init__(master, bg=area.bg_token)
         self.area = area
         self._drag_y = None
+        self._repeat = None
+        self.wide = Widening(self, self.redraw, lambda: self.hover or self._drag_y is not None)
         self.bind("<B1-Motion>", self._drag)
 
-    def _thumb(self):
+    @property
+    def t(self) -> float:
+        return self.wide.t
+
+    def _geo(self):
         a = self.area
-        track = self.lh - 8
-        if a.content_h <= a.view_h or track <= 0:
-            return None
-        th = max(24.0, track * a.view_h / a.content_h)
-        rng = a.content_h - a.view_h
-        ty = 4 + (track - th) * (a.scroll / rng)
-        return ty, th
+        return bar_geometry(self.lw, 0.0, self.lh, self.wide.t, a.view_h, a.content_h, a.scroll)
+
+    def _thumb(self):
+        g = self._geo()
+        return (g["thumb"][1], g["thumb"][3]) if g else None
+
+    def thumb_rect(self):
+        """(x, y, w, h) of the thumb in logical px (tests)."""
+        g = self._geo()
+        return g["thumb"] if g else None
+
+    def arrows_shown(self) -> bool:
+        g = self._geo()
+        return bool(g and g["arrows"])
+
+    # mouse ---------------------------------------------------------------------
+    def _on_enter(self, e=None):
+        super()._on_enter(e)
+        if self._geo() is not None:
+            self.wide.expand()
+
+    def _on_leave(self, e=None):
+        self.hover = False
+        self.pressed = False
+        if self._drag_y is None:
+            self.wide.collapse_later()
+        self._stop_repeat()
 
     def _on_press(self, e=None):
         super()._on_press(e)
-        t = self._thumb()
-        if not t or e is None:
+        g = self._geo()
+        if not g or e is None:
             return
         y = e.y / Scale.factor
-        ty, th = t
-        if ty <= y <= ty + th:
+        zone = bar_zone(g, y, 0.0, self.lh)
+        self._drag_y = None
+        if zone == "thumb":
             self._drag_y = (y, self.area.scroll)
+        elif zone in ("up", "down"):
+            self._step(-1 if zone == "up" else 1, first=True)
         else:  # page jump
-            self.area.scroll_by((self.area.view_h - 40) * (1 if y > ty else -1))
-            self._drag_y = None
+            self.area.scroll_by((self.area.view_h - 40) * (1 if y > g["thumb"][1] else -1))
+
+    def _step(self, d: int, first: bool = False):
+        self.area.scroll_by(d * STEP_PX)
+        self._repeat = self.after(REPEAT_FIRST_MS if first else REPEAT_MS, lambda: self._step(d))
+
+    def _stop_repeat(self):
+        if self._repeat is not None:
+            try:
+                self.after_cancel(self._repeat)
+            except tk.TclError:
+                log.debug("after_cancel failed", exc_info=True)
+            self._repeat = None
 
     def _drag(self, e):
         if not self._drag_y:
             return
-        t = self._thumb()
-        if not t:
+        g = self._geo()
+        if not g:
             return
         y0, s0 = self._drag_y
-        track = self.lh - 8
         rng = self.area.content_h - self.area.view_h
-        dy = e.y / Scale.factor - y0
-        self.area.scroll_to(s0 + dy * rng / max(1, track - t[1]))
+        self.area.scroll_to(s0 + (e.y / Scale.factor - y0) * rng / max(1.0, g["travel"]))
 
     def _on_release(self, e=None):
+        self._stop_repeat()
+        was_drag = self._drag_y is not None
         self._drag_y = None
         super()._on_release(None)
+        if was_drag and e is not None and not (0 <= e.x < self.winfo_width() and 0 <= e.y < self.winfo_height()):
+            self.hover = False
+            self.wide.collapse_later()
 
     def draw(self):
-        t = self._thumb()
-        if not t:
-            return
-        ty, th = t
-        if self.hover or self._drag_y:
-            self.rrect(self.lw - 3 - 6, ty, 6, th, 3, "scroll_thumb")
-        else:
-            self.rrect(self.lw - 3 - 4 + 1, ty, 2, th, 1, "scroll_thumb")
+        g = self._geo()
+        if g:
+            draw_bar(self, g, self.wide.t, Theme.c(self.bg_token),
+                     lambda x, y, key, f: self.put_cached(x, y, key, f))
 
 
 class ScrollArea(tk.Frame):
@@ -152,6 +357,7 @@ class ScrollArea(tk.Frame):
         try:
             w = e.widget.winfo_containing(e.x_root, e.y_root)
         except (tk.TclError, AttributeError, KeyError):
+            log.debug("ScrollArea._dispatch: (tk.TclError, AttributeError, KeyError) caught", exc_info=True)   # remark 81
             w = None
         while w is not None:
             handler = getattr(w, "wheel_handler", None)   # stage 4: the photo strip scrolls sideways

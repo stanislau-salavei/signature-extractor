@@ -1,4 +1,4 @@
-"""Stage 4 widgets: InfoBar (38–42, 46, reason line 40), photo strip (14, 16, 63) and the
+"""Stage 4 widgets: InfoBar (38–42, 46; remark 89: reasons inside the card), photo strip (14, 16, 63) and the
 dimmed main area while a batch is being written (17)."""
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from ui import gfx
 from ui.theme import F, S, Scale, Theme, elide, text_width
 from ui.widgets.base import Box, Control, Tooltip
 from ui.widgets.controls import Button, IconButton, Link
+from ui.widgets import scroll as SB
 
 log = logging.getLogger(__name__)
 
@@ -19,11 +20,11 @@ log = logging.getLogger(__name__)
 # --------------------------------------------------------------------------- InfoBar
 class InfoBar(Box):
     """Win11 InfoBar.  kind: warn (38–41, yellow, no ×), ok (42, green, no ×), info (46, card colours,
-    «Подробнее» + ×), reason (40: one line 32 high above the preview), note (remarks 62 / 70: why the selected
-    photo needs attention — one line 24 high right under the yellow bar, no fill; full text in a tooltip)."""
+    «Подробнее» + ×).  Remark 89: the message may have several lines («\\n»), one per reason, all inside the
+    card; an elided line shows the full message in a tooltip."""
 
-    FILL = {"warn": ("warn_bg", "warn_stroke"), "reason": ("warn_bg", "warn_stroke"),
-            "ok": ("ok_bg", "ok_stroke"), "info": ("card", "card_stroke"), "note": ("bg", None)}
+    FILL = {"warn": ("warn_bg", "warn_stroke"), "ok": ("ok_bg", "ok_stroke"), "info": ("card", "card_stroke")}
+    LINE = 16.9
 
     def __init__(self, master, app, kind: str, action: Optional[Callable] = None,
                  link: Optional[Callable] = None, close: Optional[Callable] = None):
@@ -39,14 +40,23 @@ class InfoBar(Box):
         self.close = IconButton(self, "dismiss", 16, bg=bg, command=close, color="muted",
                                 hover_token="ctl_hover") if close else None
         self._action_text = ""
-        if kind == "note":
-            self.bind("<Enter>", lambda e: self._tip())
-            self.bind("<Leave>", lambda e: self._untip())
+        self.bind("<Enter>", lambda e: self._tip(), add="+")
+        self.bind("<Leave>", lambda e: self._untip(), add="+")
+
+    def lines(self) -> list:
+        return [ln for ln in self.msg.split("\n") if ln] if self.msg else []
+
+    def _room(self) -> float:
+        return max(10.0, self._text_right - 49)
+
+    def elided(self) -> bool:
+        room = self._room()
+        return any(text_width(ln, 12.5) > room for ln in self.lines())
 
     def _tip(self):
         from ui.widgets.base import Tooltip
-        if self.title and text_width(self.title, 12.5) > self.lw - 25:
-            Tooltip.schedule(self, lambda: self.title)
+        if self.elided():
+            Tooltip.schedule(self, lambda: self.msg)
 
     def _untip(self):
         from ui.widgets.base import Tooltip
@@ -61,12 +71,9 @@ class InfoBar(Box):
             self.link.set_text(link)
 
     def height(self) -> float:
-        if self.kind == "reason":
-            return 32.0
-        if self.kind == "note":
-            return 24.0
-        if self.msg:
-            return 54.8           # padding 8 + 1 + title 16.9 + 1 + message 16.9 + 1 + 8 + borders
+        n = len(self.lines())
+        if n:
+            return 54.8 + self.LINE * (n - 1)   # padding 8 + 1 + title 16.9 + 1 + n × 16.9 + 1 + 8 + borders
         if self.close:
             return 50.0           # the 32 px × button sets the height (46)
         return 48.0               # min-height (42)
@@ -94,17 +101,10 @@ class InfoBar(Box):
     def draw(self):
         w, h = self.lw, self.lh
         fill, stroke = self.FILL[self.kind]
-        if self.kind == "note":
-            self.icon("warn_triangle", 1, (h - 16) / 2, 16, None)
-            self.text(25, h / 2, elide(self.title, w - 25, 12.5), 12.5)
-            return
         self.rrect(0, 0, w, h, 4, fill, stroke)
-        if self.kind == "reason":
-            self.icon("warn_triangle", 13, (h - 16) / 2, 16, None)
-            room = w - 37 - 12
-            self.text(37, h / 2, elide(self.title, room, 12.5), 12.5)
-            return
-        ic = (h - 20) / 2
+        lines = self.lines()
+        # icon in the middle (mockups 38–41); with several reason lines it stays by the title and the first line
+        ic = min((h - 20) / 2, 1 + 8 + 1 + self.LINE - 10)
         if self.kind == "warn":
             self.icon("warn_triangle", 17, ic, 20, None)
         elif self.kind == "ok":
@@ -112,10 +112,11 @@ class InfoBar(Box):
         else:
             self.put_cached(17, ic, ("ibinfo", Theme.c("accent"), Theme.mode),
                             lambda: _info_icon(Theme.c("accent"), Theme.c("on_accent")))
-        room = max(10.0, self._text_right - 49)
-        if self.msg:
+        room = self._room()
+        if lines:
             self.text(49, 1 + 8 + 1 + 8.45, elide(self.title, room, 13, "semibold"), 13, "semibold")
-            self.text(49, 1 + 8 + 1 + 16.9 + 8.45, elide(self.msg, room, 12.5), 12.5)
+            for i, ln in enumerate(lines):
+                self.text(49, 1 + 8 + 1 + self.LINE * (i + 1) + 8.45, elide(ln, room, 12.5), 12.5)
         else:
             self.text(49, h / 2, elide(self.title, room, 13, "semibold"), 13, "semibold")
 
@@ -276,59 +277,108 @@ def _arrow_image(kind: str, hover: bool) -> Image.Image:
 
 
 class _HBar(Control):
-    """Horizontal overlay scrollbar under the thumbnails (Win11 / Notepad: 2 px line, 6 px on hover)."""
+    """Horizontal scrollbar under the thumbnails.  Remark 86: works like the other Windows 11 bars (remark 79,
+    ui/widgets/scroll.py): at rest a 2 px line about 4 px under the tiles; on hover it widens smoothly to a 6 px
+    thumb with a 12 px track and arrows at both ends; it narrows about 1 s after the pointer leaves.  An arrow
+    scrolls by one tile (and repeats while held), a click on the track by a page, the thumb can be dragged.
+    The round «‹» / «›» buttons of the strip stay."""
+
+    H = SB.ZONE_W                  # 12 px zone (the track when widened)
+    REST_GAP = 7.5                 # rest line 2.5–4.5 px from the top of the zone (≈ 4 px under the tiles, as before)
+    WIDE_GAP = 3.0                 # widened 6 px thumb centred in the 12 px track
 
     def __init__(self, strip: "PhotoStrip"):
         super().__init__(strip, bg="card")
         self.strip = strip
         self._drag = None
+        self._repeat = None
+        self.wide = SB.Widening(self, self.redraw, lambda: self.hover or self._drag is not None)
         self.bind("<B1-Motion>", self._move)
         self.wheel_handler = strip.wheel
 
-    def _thumb(self):
+    @property
+    def t(self) -> float:
+        return self.wide.t
+
+    def _geo(self):
         s = self.strip
-        track = self.lw
-        view, total = s.view_w(), s.content_w()
-        if total <= view or track <= 0:
-            return None
-        tw = max(24.0, track * view / total)
-        tx = (track - tw) * (s.scroll / max(1.0, total - view))
-        return tx, tw
+        return SB.hbar_geometry(self.lh, 0.0, self.lw, self.wide.t, s.view_w(), s.content_w(), s.scroll,
+                                self.REST_GAP, self.WIDE_GAP)
+
+    def _thumb(self):
+        g = self._geo()
+        return (g["thumb"][0], g["thumb"][2]) if g else None
+
+    def thumb_rect(self):
+        g = self._geo()
+        return g["thumb"] if g else None
+
+    def arrows_shown(self) -> bool:
+        g = self._geo()
+        return bool(g and g["arrows"])
+
+    # mouse ---------------------------------------------------------------------
+    def _on_enter(self, e=None):
+        super()._on_enter(e)
+        if self._geo() is not None:
+            self.wide.expand()
+
+    def _on_leave(self, e=None):
+        self.hover = False
+        self.pressed = False
+        if self._drag is None:
+            self.wide.collapse_later()
+        self._stop_repeat()
 
     def _on_press(self, e=None):
         super()._on_press(e)
-        t = self._thumb()
-        if not t or e is None:
+        g = self._geo()
+        if not g or e is None:
             return
         x = e.x / Scale.factor
-        if t[0] <= x <= t[0] + t[1]:
+        zone = SB.hbar_zone(g, x, 0.0, self.lw)
+        self._drag = None
+        if zone == "thumb":
             self._drag = (x, self.strip.scroll)
+        elif zone in ("left", "right"):
+            self._step(-1 if zone == "left" else 1, first=True)
         else:
-            self.strip.page(1 if x > t[0] else -1)
+            self.strip.page(1 if x > g["thumb"][0] else -1)
+
+    def _step(self, d: int, first: bool = False):
+        self.strip.scroll_to(self.strip.scroll + d * PITCH)
+        self._repeat = self.after(SB.REPEAT_FIRST_MS if first else SB.REPEAT_MS, lambda: self._step(d))
+
+    def _stop_repeat(self):
+        if self._repeat is not None:
+            try:
+                self.after_cancel(self._repeat)
+            except tk.TclError:
+                log.debug("_HBar._stop_repeat: after_cancel failed", exc_info=True)   # remark 81
+            self._repeat = None
 
     def _move(self, e):
-        t = self._thumb()
-        if not self._drag or not t:
+        g = self._geo()
+        if not self._drag or not g:
             return
         x0, s0 = self._drag
         s = self.strip
         rng = s.content_w() - s.view_w()
-        s.scroll_to(s0 + (e.x / Scale.factor - x0) * rng / max(1.0, self.lw - t[1]))
+        s.scroll_to(s0 + (e.x / Scale.factor - x0) * rng / max(1.0, g["travel"]))
 
     def _on_release(self, e=None):
+        self._stop_repeat()
+        was_drag = self._drag is not None
         self._drag = None
         super()._on_release(None)
+        if was_drag and e is not None and not (0 <= e.x < self.winfo_width() and 0 <= e.y < self.winfo_height()):
+            self.hover = False
+            self.wide.collapse_later()
 
     def draw(self):
-        t = self._thumb()
-        if not t:
-            return
-        tx, tw = t
-        cy = self.lh / 2
-        if self.hover or self._drag:
-            self.rrect(tx, cy - 3, tw, 6, 3, "scroll_thumb")
-        else:
-            self.rrect(tx, cy - 1, tw, 2, 1, "scroll_thumb")
+        g = self._geo()
+        if g:
+            SB.draw_bar(self, g, self.wide.t, Theme.c("card"), lambda x, y, key, f: self.put_cached(x, y, key, f))
 
 
 class PhotoStrip(Box):
@@ -467,7 +517,8 @@ class PhotoStrip(Box):
         elif self.add:
             self.add.hide()
         self.film.geom(11, FILM_TOP - RING, w - 22, TILE + 2 * RING)
-        self.bar.geom(13, FILM_TOP + TILE + 4 - 2, w - 26, 9)
+        # remark 86: the 12 px bar zone starts under the selection ring; the rest line stays where it was
+        self.bar.geom(13, FILM_TOP + TILE + RING, w - 26, _HBar.H)
         self.scroll = max(0.0, min(self.scroll, self.max_scroll()))
         self.film.redraw()
         self.bar.redraw()
@@ -539,7 +590,7 @@ class DimLayer:
             try:
                 self.cv.destroy()
             except tk.TclError:
-                pass
+                log.debug("DimLayer.hide: tk.TclError caught", exc_info=True)   # remark 81
             self.cv = None
 
     @property

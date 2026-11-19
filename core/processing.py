@@ -8,9 +8,8 @@ Pipeline (per photo):
   5. «Фильтр по цвету чернил»: Auto = Lab clustering of dark pixels, a clearly coloured group
      (blue / violet ink) is the signature, grey-black print and ruling are dropped;
      Manual = colour picked with the eyedropper;
-  6. AI detection (IS-Net, ONNX Runtime + DirectML, bundled model) — optional, see ``ai.py``;
-  7. crop frame: automatic around the signature (largest ink cluster) or the user frame;
-  8. «Удаление шума» (small specks), «Толщина» (dilate / erode), eraser strokes.
+  6. crop frame: automatic around the signature (largest ink cluster) or the user frame;
+  7. «Удаление шума» (small specks), «Толщина» (dilate / erode), eraser strokes.
 """
 from __future__ import annotations
 
@@ -27,6 +26,7 @@ from PIL import Image, ImageOps
 try:
     import cv2
 except ImportError:  # pragma: no cover - cv2 is a hard requirement of the app
+    logging.getLogger(__name__).debug("module: ImportError caught", exc_info=True)   # remark 81
     cv2 = None
 
 try:
@@ -35,6 +35,7 @@ try:
     register_heif_opener()
     HAS_HEIF = True
 except Exception:  # pragma: no cover
+    logging.getLogger(__name__).debug("module: Exception caught", exc_info=True)   # remark 81
     HAS_HEIF = False
 
 log = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ def file_too_large(path: Path) -> bool:
     try:
         return Path(path).stat().st_size > MAX_FILE_BYTES
     except OSError:
+        log.debug("file_too_large: OSError caught", exc_info=True)   # remark 81
         return False
 
 
@@ -127,6 +129,7 @@ def plausible_dpi(value) -> Optional[float]:
     try:
         v = float(value)
     except (TypeError, ValueError):
+        log.debug("plausible_dpi: (TypeError, ValueError) caught", exc_info=True)   # remark 81
         return None
     if not math.isfinite(v) or v <= MIN_TRUSTED_DPI + 0.5 or v > MAX_TRUSTED_DPI:
         return None
@@ -208,7 +211,6 @@ class ProcessParams:
     ink_mode: str = "auto"                       # "auto" | "manual"
     ink_rgb: Optional[Tuple[int, int, int]] = None  # manual (eyedropper) colour
     exclude_rgb: Optional[Tuple[int, int, int]] = None  # remark 66: «Исключить цвет» (manual mode only)
-    ai: bool = False
     sensitivity: int = DEFAULT_SENSITIVITY       # 0..100
     denoise: int = DEFAULT_DENOISE               # 0..100
     thickness: int = DEFAULT_THICKNESS           # -3..+3, shown as ±0 without units
@@ -761,8 +763,8 @@ def count_strokes(mask: np.ndarray, min_area: int = 4) -> int:
 
 
 def process(photo: Photo, params: ProcessParams, frame: Optional[Tuple[int, int, int, int]] = None,
-            eraser: Sequence[EraserStroke] = (), ai_alpha: Optional[np.ndarray] = None) -> ProcessResult:
-    """Full pipeline. ``frame`` = user frame (None = automatic). ``ai_alpha`` = AI saliency 0..1."""
+            eraser: Sequence[EraserStroke] = ()) -> ProcessResult:
+    """Full pipeline. ``frame`` = user frame (None = automatic). Remark 78: no AI step in v1.0."""
     h, w = photo.rgb.shape[:2]
     dark = _darkness(photo, params.flatten)
     alpha = _soft_alpha(dark, params.sensitivity)
@@ -797,8 +799,6 @@ def process(photo: Photo, params: ProcessParams, frame: Optional[Tuple[int, int,
                     alpha = alpha * gate
             else:
                 ink_state = "same"
-    if params.ai and ai_alpha is not None and ai_alpha.shape == alpha.shape:
-        alpha = alpha * np.clip(ai_alpha, 0, 1)
 
     mask = alpha >= 0.5
     # noise removal: drop specks smaller than a size driven by the slider (in mm²)

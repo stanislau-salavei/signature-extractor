@@ -13,6 +13,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from core import processing as P
+from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
@@ -194,11 +195,11 @@ def test_r68_tiny_specks_do_not_make_a_busy_background():
 
 
 # ------------------------------------------------------------------ 62
-def test_r62_reasons_are_joined_with_semicolons():
+def test_r62_reasons_one_per_line():
     from core.i18n import I18n
     from ui.pages.process_page import doubt_text
     i = I18n(CSV, "ru")
-    assert doubt_text(i.t, ("pale", "several")) == ("Подпись бледная — проверьте, все ли штрихи на месте; "
+    assert doubt_text(i.t, ("pale", "several")) == ("Подпись бледная — проверьте, все ли штрихи на месте\n"   # 89
                                                    "На фото несколько подписей — проверьте, выбрана ли нужная")
     assert doubt_text(i.t, ("ink_stamp",)) == "Цвет чернил похож на печать — проверьте подпись"
     assert doubt_text(i.t, ()) == ""
@@ -207,8 +208,8 @@ def test_r62_reasons_are_joined_with_semicolons():
 # ------------------------------------------------------------------ i18n, help
 def test_r59_71_i18n_rows_and_csv_identity():
     r = rows()
-    assert len(r) == 356
-    assert CSV.read_bytes() == PROMPT_CSV.read_bytes()
+    assert len(r) == 346          # remark 78 removed 10 rows (tests/i18n_prompt_diff.py)
+    assert_matches_prompt(CSV, PROMPT_CSV)     # remarks 77–85: approved differences only
     exp = {
         "batch.doubt.pale": ("Подпись бледная — проверьте, все ли штрихи на месте", "The signature is faint — check that all strokes are there"),
         "batch.doubt.busy": ("Сложный фон — в результат могли попасть лишние элементы", "Busy background — extra elements may be included"),
@@ -236,7 +237,7 @@ def test_r60_61_69_70_71_help_texts():
     assert c.endswith("«Цвет подписи по умолчанию».")
     assert "The + button adds a custom color. To delete a custom color, select it and click Delete color below the swatches, or right-click its swatch." in r["help.formats.color"][3]
     a = r["help.batch.attention_text"]
-    assert "жёлтая панель (при одном фото — над изображением), а под ней — причина для выбранного фото" in a[2]
+    assert "жёлтая панель (при одном фото — под изображением), а в ней — причина для выбранного фото" in a[2]   # 77, 89
     assert a[2].endswith("Если подпись не найдена, экспорт будет недоступен, пока вы не поправите или не уберёте это фото. Если есть сомнения, экспорт доступен, но фото стоит проверить.")
     assert a[3].endswith("If no signature is found, export is unavailable until you fix or remove that photo. If there are doubts, export is available, but check the photo.")
     assert r["help.batch.attention_reasons"][2].startswith("Возможные причины: подпись бледная")
@@ -245,7 +246,7 @@ def test_r60_61_69_70_71_help_texts():
     assert r["help.process.frame1"][2].endswith("проверьте, что выбрана нужная.")
     assert r["help.prep.paper_text"][2].endswith("а лишнее уберите через «Исключить цвет».")
     assert r["help.process.frame4"][2].startswith("Линии таблиц и линовку рамка не учитывает.")
-    assert r["process.meta.frame_large"][2] == "Если рамка охватывает больше половины листа, попробуйте включить «AI-поиск подписи»."
+    assert r["process.meta.frame_large"][2] == "Если рамка охватывает больше половины листа, уменьшите её или уберите лишнее ластиком"   # 78, 85
     assert r["help.batch.add_remove_text"][2].endswith("Чтобы вернуться на начальный экран, выберите в меню ⋯ «Начать заново». Программа всегда спросит подтверждение, а без загруженных фото пункт неактивен.")
     assert r["help.batch.add_remove_text"][3].endswith("To go back to the start screen, choose Start over from the ⋯ menu. The app always asks you to confirm; with no photos loaded, the item is unavailable.")
 
@@ -353,10 +354,10 @@ def test_r70_single_photo_doubt_bar_and_reason(app, doubt_photo):
     pump(app, 150)
     pp = app.process_page
     assert app.batch is None and app.job.status == "doubt" and "several" in app.job.doubts
-    assert pp.warn_bar.visible and pp.note.visible and not pp.strip.visible
+    assert pp.warn_bar.visible and not pp.strip.visible
     assert pp.warn_bar.title == "Требует внимания" and not pp.warn_bar.action.visible
-    assert "На фото несколько подписей" in pp.note.title
-    assert pp.warn_bar.ly < pp.note.ly < pp.preview.ly                # above the image, reason under the bar
+    assert "На фото несколько подписей" in pp.warn_bar.msg            # remark 89: the reason inside the card
+    assert pp.preview.ly < pp.warn_bar.ly                             # remark 77: under the image
     assert not pp.bar.next.disabled                                 # export stays open
 
 

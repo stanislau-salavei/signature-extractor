@@ -214,7 +214,7 @@ def test_r74_single_photo_not_found_card_under_the_image(app, blank_photo):
     pp = app.process_page
     assert app.batch is None and app.job.status == "attention"
     assert Popup.current is None                                      # no dialog 30
-    assert pp.warn_bar.visible and not pp.strip.visible and not pp.note.visible
+    assert pp.warn_bar.visible and not pp.strip.visible and not hasattr(pp, "note")
     assert pp.warn_bar.title == "Требует внимания"
     assert pp.warn_bar.msg == app.t("batch.reason_not_found")
     assert not pp.warn_bar.action.visible

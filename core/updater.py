@@ -10,6 +10,7 @@
 Network access goes through ``fetch`` / ``open_stream`` so tests can replace it (local http.server)."""
 from __future__ import annotations
 
+import logging
 import datetime as _dt
 import hashlib
 import json
@@ -21,6 +22,8 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Tuple
+
+log = logging.getLogger(__name__)
 
 API_LATEST = "https://api.github.com/repos/stanislau-salavei/signature-extractor/releases/latest"
 USER_AGENT = "signature-extractor-updater"
@@ -103,6 +106,7 @@ def check_latest(current: str, api_url: str = API_LATEST, fetcher: Callable[[str
         data = json.loads(fetcher(api_url).decode("utf-8"))
         rel = parse_release(data)
     except Exception:
+        log.debug("check_latest: Exception caught", exc_info=True)   # remark 81
         return CheckResult("offline")
     if is_newer(rel.version, current):
         return CheckResult("new", rel)
@@ -123,7 +127,7 @@ def expected_sha256(rel: Release, fetcher: Callable[[str], bytes] = None) -> Opt
             if s:
                 return s
         except Exception:
-            pass
+            log.warning("expected_sha256: Exception caught", exc_info=True)   # remark 81
     return sha_from_text(rel.notes)
 
 
@@ -194,7 +198,7 @@ def _rm(p: Path) -> None:
     try:
         Path(p).unlink()
     except OSError:
-        pass
+        log.debug("_rm: OSError caught", exc_info=True)   # remark 81
 
 
 # ------------------------------------------------------------------ once a day
@@ -206,6 +210,7 @@ def due(last: Optional[str], now: Optional[_dt.datetime] = None, hours: float = 
     try:
         prev = _dt.datetime.fromisoformat(str(last))
     except ValueError:
+        log.debug("due: ValueError caught", exc_info=True)   # remark 81
         return True
     if prev > now:               # clock moved back
         return True

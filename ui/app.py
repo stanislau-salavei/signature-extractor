@@ -1,4 +1,4 @@
-"""Main window and state controller (screens 1–3 + Settings)."""
+"""Main window (screens 1–3 + Settings); the state itself lives in ``core.state`` (remark 82)."""
 from __future__ import annotations
 
 import logging
@@ -18,6 +18,7 @@ from core import processing as P
 from core.history import HistoryStack
 from core.i18n import I18n
 from core.settings import SettingsManager
+from core.state import AppState
 from core.worker import BackgroundWorker
 from ui import gfx, platform_win
 from ui.theme import Fonts, S, Scale, Theme
@@ -30,6 +31,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 REPO_URL = "https://github.com/stanislau-salavei/signature-extractor"
 LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
 VERSION = "1.0"
+RELEASE_TAG = "v" + VERSION          # remark 84: the release is v1.0 and its Git tag is v1.0 (not v1.0.0)
 CLIENT_W, CLIENT_H = 1280, 768      # 1280 × 800 together with the 32 px title bar (mockups)
 MIN_W, MIN_H = 1024, 648            # 1024 × 680 window
 
@@ -47,6 +49,7 @@ try:
                 log.warning("tkdnd not available, drag and drop disabled", exc_info=True)
                 self.dnd_ok = False
 except Exception:  # pragma: no cover
+    log.debug("module: Exception caught", exc_info=True)   # remark 81
     DND_FILES = None
 
     class _Root(ctk.CTk):
@@ -58,28 +61,39 @@ from core.batch import LOADED_MAX, Batch, EditState, Job  # noqa: E402  (re-expo
 from core import batch as B  # noqa: E402
 
 
+def _state(name: str, doc: str = ""):
+    """Remark 82: an App attribute kept in the state controller (core.state.AppState)."""
+    return property(lambda self: getattr(self.state, name), lambda self, v: setattr(self.state, name, v), doc=doc)
+
+
 class App:
     VERSION_STR = VERSION
+    job = _state("job", "current photo")
+    batch = _state("batch", "stage 4: folder / several files")
+    page = _state("page", "import | busy | process | export")
+    saving = _state("saving", "a batch is being written (17): navigation is locked")
+    settings_open = _state("settings_open")
+    help_open = _state("help_open", "remark 30: «Справка» page from the ⋯ menu")
+    pending_skipped = _state("pending_skipped")
+    _recent = _state("recent", "batch photos kept loaded (current + recent)")
+    _load_error_shown = _state("load_error_shown")
+    _pending_params = _state("pending_params")
+    _work_token = _state("saved_token", "remark 39: snapshot of the last successful save")
 
     def __init__(self, argv: Sequence[str]):
         platform_win.enable_per_monitor_dpi_v2()
+        self.state = AppState(LOADED_MAX)      # remark 82: page, photo, batch, saving … (no UI)
         self.settings = SettingsManager(list(argv))
         self.i18n = I18n(ROOT_DIR / "i18n" / "strings_ru_en.csv", self.settings.effective_language())
+        self.settings.fix_save_folder(self.t("export.default_folder"))      # remark 83
         self.root = _Root()
+        from core.logs import tk_callback_error
+        self.root.report_callback_exception = tk_callback_error      # remark 81: callback errors go to the log
         gfx.clear_cache()      # PhotoImages belong to one Tk interpreter (several apps in one test run)
         self.root.withdraw()
         Scale.factor = ctk.ScalingTracker.get_widget_scaling(self.root)
         Fonts.init(self.root)
         self.worker = BackgroundWorker()
-        self.job: Optional[Job] = None
-        self.batch: Optional[Batch] = None   # stage 4: folder / several files
-        self.saving = False                  # a batch is being written (17): navigation is locked
-        self._recent: List[Job] = []         # batch photos kept loaded (current + recent)
-        self._load_error_shown = False
-        self.page = "import"         # import | busy | process | export
-        self.settings_open = False
-        self.help_open = False       # remark 30: «Справка» page from the ⋯ menu
-        self.pending_skipped = None
         self._last_size = (0, 0)
         self._sys_dark = None
 
@@ -179,6 +193,7 @@ class App:
         lang = self.settings.effective_language()
         if lang != self.i18n.lang:
             self.set_language_pref(self.settings.get("language", "system"))
+        self.settings.fix_save_folder(self.t("export.default_folder"))      # remark 83: in the language after reset
         if self.settings_page is not None:
             self.settings_page.sync()
 
@@ -255,7 +270,7 @@ class App:
         self.header.layout(self.width())
 
     def show_page(self, name: str):
-        self.page = name
+        self.state.set_page(name)
         Popup.close_current()
         if name == "process" and self.process_page is None:
             from ui.pages.process_page import ProcessPage
@@ -284,7 +299,7 @@ class App:
     # ------------------------------------------------------------------ settings page
     def overlay_open(self) -> bool:
         """A full-window page (Параметры or Справка) covers the steps."""
-        return self.settings_open or self.help_open
+        return self.state.overlay_open()
 
     def open_settings(self):
         if self.help_open:
@@ -329,9 +344,7 @@ class App:
 
     def has_photos(self) -> bool:
         """Remark 71: something is loaded (or loading) — «Начать заново» is grey on screen 1 without photos."""
-        if self.page in ("busy", "process", "export"):
-            return True
-        return self.job is not None or (self.batch is not None and bool(self.batch.items))
+        return self.state.has_photos()
 
     def start_over(self):
         """Remark 71: ⋯ › «Начать заново» always asks «Начать заново?», then goes to screen 1."""
@@ -397,15 +410,15 @@ class App:
         AboutDialog(self)
 
     def report_issue(self):
-        """«Сообщить о проблеме» (stage 5): a new GitHub issue with the app version, Windows and the graphics
-        card already filled in (English body, no title — user decision)."""
+        """«Сообщить о проблеме» (stage 5): a new GitHub issue with the app version, Windows and the language
+        already filled in (English body, no title — user decision; remark 88: no graphics card / DirectX 12)."""
         self.open_url(self.issue_url())
 
     def issue_url(self) -> str:
         import urllib.parse
         from ui import platform_win as pw
-        body = self.t("issue.body", version=self.VERSION_STR, windows=pw.windows_version(), gpu=pw.gpu_names(),
-                      dx12="yes" if pw.dx12_supported() else "no", lang=self.i18n.lang).replace("\\n", "\n")
+        body = self.t("issue.body", version=self.VERSION_STR, windows=pw.windows_version(),
+                      lang=self.i18n.lang).replace("\\n", "\n")
         url = f"{REPO_URL}/issues/new?" + urllib.parse.urlencode({"body": body})
         return url[:2000]
 
@@ -417,7 +430,7 @@ class App:
         try:
             self.worker.cancel("process")
         except Exception:
-            pass
+            log.warning("App.quit: Exception caught", exc_info=True)   # remark 81
         self.root.after(1, self.root.destroy)
 
     def open_url(self, url: str):
@@ -439,16 +452,8 @@ class App:
     # ------------------------------------------------------------------ keys
     def _bind_keys(self):
         r = self.root
-        r.bind_all("<Control-o>", lambda e: self._key(self.open_file_dialog))
-        r.bind_all("<Control-O>", lambda e: self._key(self.open_file_dialog))
-        r.bind_all("<Control-s>", lambda e: self._key(self.go_export))
-        r.bind_all("<Control-S>", lambda e: self._key(self.go_export))
-        r.bind_all("<Control-z>", lambda e: self._key(self.undo, text_ok=False))
-        r.bind_all("<Control-y>", lambda e: self._key(self.redo, text_ok=False))
-        r.bind_all("<Control-Shift-Z>", lambda e: self._key(self.redo, text_ok=False))
-        r.bind_all("<Control-Shift-z>", lambda e: self._key(self.redo, text_ok=False))
-        r.bind_all("<Control-v>", lambda e: self._key(self.paste_clipboard, text_ok=False))
-        r.bind_all("<Control-V>", lambda e: self._key(self.paste_clipboard, text_ok=False))
+        # remark 80: one handler for every Ctrl+letter, by the physical key (any keyboard layout, ui/keys.py)
+        r.bind_all("<Control-KeyPress>", self._ctrl_key, add="+")
         r.bind_all("<Escape>", self._esc, add="+")
         # stage 4: ← / → switch photos of the batch (screens 2 and 3)
         r.bind_all("<Left>", lambda e: self._arrow_key(-1), add="+")
@@ -461,6 +466,36 @@ class App:
             return None
         self.step_photo(d)
         return "break"
+
+    def _ctrl_key(self, e):
+        """Ctrl+O open, Ctrl+S export, Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo, Ctrl+V paste — whatever the
+        layout.  In a text field with a non-Latin layout the field's own Ctrl+A/C/V/X/Z/Y are sent as Tk
+        virtual events (with a Latin layout Tk's class bindings already did it)."""
+        from ui import keys as K
+        try:
+            ws = self.root.tk.call("tk", "windowingsystem")
+        except tk.TclError:
+            log.debug("windowingsystem unknown", exc_info=True)
+            ws = ""
+        letter = K.latin_letter(str(e.keysym), int(e.keycode or 0), ws)
+        if letter is None:
+            return None
+        shift = bool(int(e.state or 0) & K.SHIFT)
+        focus = self.root.focus_get()
+        if isinstance(focus, tk.Entry) and not K.is_latin_keysym(str(e.keysym)) and letter in K.ENTRY_EVENTS:
+            focus.event_generate(K.ENTRY_EVENTS[letter])
+            return "break"
+        if letter == "o":
+            return self._key(self.open_file_dialog)
+        if letter == "s":
+            return self._key(self.go_export)
+        if letter == "z":
+            return self._key(self.redo if shift else self.undo, text_ok=False)
+        if letter == "y":
+            return self._key(self.redo, text_ok=False)
+        if letter == "v":
+            return self._key(self.paste_clipboard, text_ok=False)
+        return None
 
     def _key(self, fn, text_ok=True):
         if self.saving:
@@ -512,6 +547,7 @@ class App:
         try:
             paths = [Path(p) for p in self.root.tk.splitlist(e.data)]
         except Exception:
+            log.debug("App._dnd_drop: Exception caught", exc_info=True)   # remark 81
             paths = []
         if paths and not self.saving:
             # decision 7: a drop on screens 2–3 is new work («Начать заново?» when there is unsaved work)
@@ -570,26 +606,21 @@ class App:
     # save — edits, Ctrl+Z/Y, «Убрать»/«Добавить», «Применить настройки ко всем», export settings, a cancelled
     # or failed save.  A snapshot of (photo id, version) per photo + the export settings is taken on a
     # successful save; «Назад»/«Далее» change nothing.
-    def work_token(self):
-        jobs = list(self.batch.items) if self.batch is not None else ([self.job] if self.job is not None else [])
+    def _export_key(self):
         ep = self.export_page
-        return (tuple((j.id, j.version) for j in jobs), ep.export_key() if ep is not None else None)
+        return ep.export_key() if ep is not None else None
+
+    def work_token(self):
+        return self.state.work_token(self._export_key())
 
     def mark_saved(self):
-        self._work_token = self.work_token()
+        self.state.mark_saved(self._export_key())
 
     def mark_save_failed(self):
-        self._work_token = None
+        self.state.mark_save_failed()
 
     def has_unsaved(self) -> bool:
-        if self.page not in ("process", "export"):
-            return False
-        if self.batch is not None:
-            if not self.batch.items:
-                return False
-        elif self.job is None or self.job.result is None:
-            return False
-        return getattr(self, "_work_token", None) != self.work_token()
+        return self.state.has_unsaved(self._export_key())
 
     def confirm_restart(self, then):
         if self.saving:
@@ -624,7 +655,7 @@ class App:
                 self.show_error_dialog(self.t("errors.open.title"), self.t("errors.open.body", file=f.name))
             return
         if is_batch:
-            batch = Batch(scan.photos, scan.too_large, params=P.ProcessParams(ai=bool(self.settings.get("ai_default"))))
+            batch = Batch(scan.photos, scan.too_large, params=P.ProcessParams())
             go = lambda: self.start_batch(batch)   # noqa: E731
         else:
             photo_path = scan.photos[0]
@@ -645,8 +676,7 @@ class App:
 
     def start_processing(self, loader):
         self.reset_batch()
-        ai = bool(self.settings.get("ai_default"))
-        params = P.ProcessParams(ai=ai)
+        params = P.ProcessParams()
         self._pending_params = params
         self.job = None
         self.show_page("busy")
@@ -654,22 +684,10 @@ class App:
         def work():
             img, dpi, name = loader()
             photo = P.prepare_photo(img, dpi, name)
-            res = P.process(photo, params, ai_alpha=self._ai_alpha(photo, params))
+            res = P.process(photo, params)
             return photo, res
 
         self.worker.submit("process", work, self._loaded, self._load_failed)
-
-    def _ai_alpha(self, photo, params):
-        if not params.ai:
-            return None
-        try:
-            from core import ai
-            from ui import platform_win
-            gpu = bool(self.settings.get("gpu_acceleration")) and platform_win.dx12_supported()
-            return ai.saliency(photo, gpu=gpu)
-        except Exception:
-            log.warning("AI detection unavailable", exc_info=True)
-            return None
 
     def _loaded(self, value):
         photo, res = value
@@ -701,12 +719,8 @@ class App:
 
     # ------------------------------------------------------------------ batch (stage 4)
     def reset_batch(self):
-        if self.batch is not None:
-            for j in self.batch.items:
-                self.worker.cancel(f"job:{j.id}")
-        self.batch = None
-        self._recent = []
-        self._load_error_shown = False
+        for j in self.state.clear_batch():
+            self.worker.cancel(f"job:{j.id}")
 
     def start_batch(self, batch: Batch):
         """Screen 03 while the first photo is processed, then screen 2; the rest runs in the background."""
@@ -732,7 +746,7 @@ class App:
         state, version, photo = job.state, job.version, job.photo
 
         def work():
-            return B.process_job(job, state, photo, self._ai_alpha)
+            return B.process_job(job, state, photo)
 
         def done(res):
             self._job_done(job, version, res, on_first)
@@ -763,7 +777,7 @@ class App:
             for other in b.items[1:]:
                 if other.busy:
                     self.process_job(other, background=True)
-        elif job is not self.job and job not in self._recent:
+        elif job is not self.job and not self.state.is_recent(job):
             job.unload()               # background result: keep only the summary
         b.note_attention()
         if job is self.job:
@@ -797,11 +811,8 @@ class App:
             self.on_batch_changed()
 
     def _touch(self, job: Job):
-        self._recent = [j for j in self._recent if j is not job] + [job]
-        while len(self._recent) > LOADED_MAX:
-            old = self._recent.pop(0)
-            if old is not self.job:
-                old.unload()
+        for old in self.state.touch(job):
+            old.unload()
 
     def step_photo(self, d: int):
         if self.batch is not None:
@@ -869,7 +880,7 @@ class App:
         if b is None:
             return
         self.worker.cancel(f"job:{job.id}")
-        self._recent = [j for j in self._recent if j is not job]
+        self.state.forget(job)
         nxt = b.remove(job)
         job.unload()
         if nxt is None:            # decision 9: the last photo removed → clean screen 1
@@ -942,15 +953,14 @@ class App:
             try:
                 size = self.t("batch.file_size", size=self.fmt_num(P.file_size_mb(f), 0))
             except OSError:
+                log.debug("App.show_skipped_list: OSError caught", exc_info=True)   # remark 81
                 size = ""
             rows.append((f.name, size))
         ContentDialog(self, self.tn("batch.skipped_large_title", len(files)), self.t("batch.skipped_large_body"),
                       [(self.t("common.close"), "primary", None)], width=440, rows=rows)
 
     def can_export(self) -> bool:
-        if self.batch is not None:
-            return self.batch.ready_for_export()
-        return self.job is not None and self.job.result is not None and not self.job.result.empty
+        return self.state.can_export()
 
     # ------------------------------------------------------------------ editing (screen 2)
     def edit(self, **changes):

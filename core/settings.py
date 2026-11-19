@@ -1,8 +1,9 @@
 """Settings file: %APPDATA%\\Signature Extractor\\settings.json (JSON, atomic write).
 
 The installer / uninstaller never touch this file.  A missing or damaged file is replaced
-by defaults.  ``name_template`` / ``save_folder`` = None mean «language default»
-(«подпись_{имя}» / ``signature_{name}``, Documents\\Подписи / Documents\\Signatures).
+by defaults.  ``name_template`` = None means «language default» («подпись_{имя}» / ``signature_{name}``);
+``save_folder`` = None is replaced at the start by Documents\\Подписи / Documents\\Signatures in the language of
+that launch and then stays (remark 83).
 """
 from __future__ import annotations
 
@@ -48,8 +49,6 @@ def documents_dir() -> Path:
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "theme": "system",            # system | light | dark
     "language": "system",         # system | ru | en
-    "ai_default": False,
-    "gpu_acceleration": True,
     "default_formats": ["PNG", "DXF"],
     "default_size": "15x5",
     "crop_margin_mm": 0.5,        # «Поле рамки», every size mode (remark 7)
@@ -58,7 +57,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "svg_line_mm": 0.18,          # SVG «Заданная толщина», separate from DXF
     "default_color": "blue",
     "png_resolution": 1200,       # remark 36: 300 | 600 | 1200 (150 removed)
-    "save_folder": None,          # None = Documents\<export.default_folder>
+    "save_folder": None,          # fixed at the first launch: Documents\<export.default_folder> (remark 83)
     "name_template": None,        # None = settings.name_template.value of the UI language
     "if_exists": "ask",           # add_number | replace | ask — remark 43: «Спрашивать» by default
     "check_updates": True,
@@ -109,6 +108,7 @@ def resolve_system_language() -> str:
         lang = os.environ.get("LANG") or locale.getlocale()[0] or ""
         return "ru" if lang and lang.lower().startswith("ru") else "en"
     except Exception:
+        log.debug("resolve_system_language: Exception caught", exc_info=True)   # remark 81
         return "en"
 
 
@@ -212,7 +212,7 @@ class SettingsManager:
             try:
                 os.remove(tmp)
             except OSError:
-                pass
+                log.debug("SettingsManager.save: OSError caught", exc_info=True)   # remark 81
             raise
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -265,6 +265,16 @@ class SettingsManager:
     def save_folder(self, folder_name: str) -> Path:
         v = self.data.get("save_folder")
         return Path(v) if v else documents_dir() / folder_name
+
+    def fix_save_folder(self, folder_name: str) -> Path:
+        """Remark 83: the default save folder (Documents\\Подписи or Documents\\Signatures, the name from the
+        table in the language of that launch) is chosen once — at the first launch or after «Сбросить» — and
+        saved, so a later language change does not move the files to another folder.  A folder the user
+        already has is used as it is (nothing is renamed or created here)."""
+        if not self.data.get("save_folder"):
+            self.data["save_folder"] = str(documents_dir() / folder_name)
+            self._safe_save()
+        return Path(self.data["save_folder"])
 
     def name_template(self, default_value: str) -> str:
         return self.data.get("name_template") or default_value

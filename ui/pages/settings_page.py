@@ -32,6 +32,7 @@ DPI_COMBO_MIN = 120
 GAP = 7
 GROUP_GAP = 28          # + header 20 + 8 = 56 between groups
 REPO = "https://github.com/stanislau-salavei/signature-extractor"
+RELEASE_TAG = "v1.0"   # remark 84: tag of release v1.0 (same as ui.app.RELEASE_TAG)
 LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
 PAGE_MAX_W = 1000      # stage 5 (2k_25 / 2k_27): .col {max-width: 1000px; margin: 0 auto}
 SIZE_ROW_H = 40         # 36: rows of «Размеры подписи» 40 apart, first centre 24 below the divider
@@ -63,7 +64,7 @@ class SCard(Box):
 
     desc_room: Optional[float] = None   # remark 44: set by the page → the description wraps to fit
 
-    note_fn: Optional[Callable[[], str]] = None   # stage 5: grey line under the description (GPU without DX12)
+    note_fn: Optional[Callable[[], str]] = None   # stage 5: grey line under the description (none since remark 78)
 
     def desc_lines(self) -> List[str]:
         desc = self.desc_fn() if self.desc_fn else ""
@@ -153,16 +154,7 @@ class SettingsPage(Box):
                              for v in THEME_ORDER]
         self.c_lang = SCard(inner, self, "globe", lambda: t("settings.language"), lambda: t("settings.language.desc"))
         self.lang_combo = ComboBox(self.c_lang, app, bg="card", command=self._set_lang)
-        # ------------------------------------------------ Обработка
-        self.c_ai = SCard(inner, self, "sparkle", lambda: t("settings.ai_default"), lambda: t("settings.ai_default.desc"))
-        self.ai_toggle = Toggle(self.c_ai, bool(s.get("ai_default")), bg="card", label_fn=self._onoff,
-                                command=lambda v: s.set("ai_default", v))
-        self.c_gpu = SCard(inner, self, "gpu", lambda: t("settings.gpu"), lambda: t("settings.gpu.desc"))
-        self.gpu_toggle = Toggle(self.c_gpu, bool(s.get("gpu_acceleration")), bg="card", label_fn=self._onoff,
-                                 command=lambda v: s.set("gpu_acceleration", v))
-        # stage 5: no DirectX 12 → the toggle is inactive and shows «Откл.» (the saved choice stays),
-        # with the grey line «Видеокарта не поддерживает DirectX 12, используется процессор» under it
-        self.c_gpu.note_fn = lambda: "" if self._dx12() else t("settings.gpu.unsupported")
+        # remark 78: no section «Обработка» (AI-поиск, ускорение на видеокарте) — no AI in v1.0
         # ------------------------------------------------ Экспорт
         self.c_formats = SCard(inner, self, "formats", lambda: t("settings.formats"), lambda: t("settings.formats.desc"),
                                expandable=True, body_h=lambda: FMT_ROWS_H)   # chevron only (remark 18)
@@ -218,7 +210,7 @@ class SettingsPage(Box):
         self.c_about = SCard(inner, self, None, lambda: t("app.name"), lambda: t("app.description"),
                              summary=lambda: t("settings.version", version=app.VERSION_STR), expandable=True, open_=True, body_h=lambda: 267, logo=True)
         self.about_links = [
-            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(f"{REPO}/releases/tag/v{app.VERSION_STR}")),
+            (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(f"{REPO}/releases/tag/{RELEASE_TAG}")),
              "settings.release_notes"),
             (Link(self.c_about, "", 13.5, "link", bg="card", command=lambda: app.open_url(f"{REPO}/releases")),
              "settings.all_releases"),
@@ -242,7 +234,6 @@ class SettingsPage(Box):
 
         self.groups = [
             ("settings.appearance", [self.c_theme, self.c_lang]),
-            ("shell.step.process", [self.c_ai, self.c_gpu]),
             # remark 51: common cards first, then by format as on screen 3
             ("shell.step.export", [self.c_formats, self.c_sizes, self.c_margin, self.c_color, self.c_dpi, self.c_svg,
                                    self.c_dxf]),
@@ -276,10 +267,6 @@ class SettingsPage(Box):
     def _sizes_body_h(self):
         # 4 top + rows 40 + 11 + «Добавить размер» 32 + 19 (36: four rows → 226)
         return 4 + SIZE_ROW_H * len(self._size_options()) + 11 + SIZE_BTN_H + 19
-
-    def _dx12(self) -> bool:
-        from ui import platform_win
-        return platform_win.dx12_supported()
 
     def _svg_mode(self) -> str:
         return ex.clamp_svg_mode(self.app.settings.get("svg_mode", ex.DEFAULT_SVG_MODE))
@@ -506,10 +493,6 @@ class SettingsPage(Box):
             r.redraw()
         self.lang_combo.set_items([t("settings.language.system"), t("settings.language.ru"), t("settings.language.en")],
                                   ("system", "ru", "en").index(s.get("language", "system")))
-        self.ai_toggle.set(bool(s.get("ai_default")))
-        dx12 = self._dx12()
-        self.gpu_toggle.set(bool(s.get("gpu_acceleration")) and dx12)
-        self.gpu_toggle.set_disabled(not dx12)
         fm = s.get("default_formats") or []
         for code, (row, key) in self.fmt_rows.items():
             row.desc = t(key)
@@ -605,10 +588,6 @@ class SettingsPage(Box):
                     r.hide()
         elif c is self.c_lang:
             self._right(c, [(self.lang_combo, self.lang_combo.natural_width(), 32)], cw)
-        elif c is self.c_ai:
-            self._right(c, [(self.ai_toggle, self.ai_toggle.natural_width(), 20)], cw)
-        elif c is self.c_gpu:
-            self._right(c, [(self.gpu_toggle, self.gpu_toggle.natural_width(), 20)], cw)
         elif c is self.c_formats:
             for i, (code, (row, _)) in enumerate(self.fmt_rows.items()):
                 if c.is_open:
@@ -800,5 +779,6 @@ def _ver(v: str):
         try:
             out.append(int(re.sub(r"\D.*", "", p) or 0))
         except ValueError:
+            log.debug("_ver: ValueError caught", exc_info=True)   # remark 81
             out.append(0)
     return tuple(out)

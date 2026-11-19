@@ -13,7 +13,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    from core.logs import setup_logging
+    path = setup_logging()                    # remark 81: %APPDATA%\Signature Extractor\signature_extractor.log
+    log = logging.getLogger("main")
+    log.info("start, log %s", path)
     from ui.app import App
     app = App(argv)
     files = [Path(a) for a in argv if not a.startswith("--") and a not in ("ru", "en")]

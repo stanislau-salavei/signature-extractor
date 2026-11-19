@@ -241,6 +241,6 @@ class ContentDialog(Popup):
             try:
                 wd.destroy()
             except tk.TclError:
-                pass
+                log.debug("ContentDialog.close: tk.TclError caught", exc_info=True)   # remark 81
         self.widgets.clear()
         super().close()

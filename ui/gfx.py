@@ -115,6 +115,21 @@ def rrect(w: float, h: float, r: float, fill: Optional[str], stroke: Optional[st
     return im.resize((W, H), Image.Resampling.LANCZOS)
 
 
+def triangle(w: float, h: float, color: str, bg: str, up: bool = True) -> Image.Image:
+    """Remark 79: the small filled arrow of the Win11 scrollbar (logical w × h), slightly rounded tips."""
+    W, H = max(1, int(round(_dev(w)))), max(1, int(round(_dev(h))))
+    big = (W * SS, H * SS)
+    m = Image.new("L", big, 0)
+    d = ImageDraw.Draw(m)
+    x0, x1, y0, y1 = 0, big[0] - 1, 0, big[1] - 1
+    pts = [((x0 + x1) / 2, y0), (x1, y1), (x0, y1)] if up else [(x0, y0), (x1, y0), ((x0 + x1) / 2, y1)]
+    d.polygon(pts, fill=255)
+    m = m.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))     # soften the tips
+    im = Image.new("RGBA", big, rgba(bg))
+    im.paste(Image.new("RGBA", big, rgba(color)), (0, 0), m)
+    return im.resize((W, H), Image.LANCZOS)
+
+
 def shadow_box(w: float, h: float, r: float, layers: Sequence[Tuple[float, float, float]],
                pad: float) -> Image.Image:
     """Soft shadow (RGBA, black with alpha) for a w×h rounded box, image padded by ``pad`` on all sides.

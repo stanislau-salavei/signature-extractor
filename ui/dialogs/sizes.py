@@ -7,6 +7,7 @@
 * ``size_label`` / ``add_size`` / ``edit_size`` / ``delete_size`` / ``set_default_size`` — settings data."""
 from __future__ import annotations
 
+import logging
 import re
 from typing import Callable, Optional
 
@@ -15,6 +16,8 @@ from ui.dialogs.content import ContentDialog
 from ui.theme import text_width
 from ui.widgets.base import Box
 from ui.widgets.controls import TextBox
+
+log = logging.getLogger(__name__)
 
 NBSP = "\u00a0"
 LABEL_H, LABEL_GAP, FIELD_H, ROW_GAP = 16, 8, 32, 16
@@ -47,6 +50,7 @@ def custom_sizes(app):
         try:
             float(sz["w_mm"]), float(sz["h_mm"])
         except (KeyError, TypeError, ValueError):
+            log.debug("custom_sizes: (KeyError, TypeError, ValueError) caught", exc_info=True)   # remark 81
             continue
         out.append(dict(sz))
     return out

@@ -34,6 +34,7 @@ from PIL import Image
 try:
     import cv2
 except ImportError:  # pragma: no cover
+    logging.getLogger(__name__).debug("module: ImportError caught", exc_info=True)   # remark 81
     cv2 = None
 
 log = logging.getLogger(__name__)
@@ -118,6 +119,7 @@ def parse_number(text: str) -> Optional[float]:
     try:
         v = float(t)
     except ValueError:
+        log.debug("parse_number: ValueError caught", exc_info=True)   # remark 81
         return None
     if not math.isfinite(v):
         return None
@@ -154,6 +156,7 @@ def resolve_color(key: str, custom_colors: Sequence[dict], photo_ink: Optional[S
                 try:
                     return hex_to_rgb(c.get("hex", ""))
                 except ValueError:
+                    log.debug("resolve_color: ValueError caught", exc_info=True)   # remark 81
                     break
     return hex_to_rgb(dict(BUILTIN_COLORS)[DEFAULT_COLOR_KEY])
 
@@ -212,6 +215,7 @@ def size_choice_for_key(key: str, custom_sizes: Sequence[dict], custom_wh: Tuple
                 try:
                     return SizeChoice.box(float(s["w_mm"]), float(s["h_mm"]))
                 except (KeyError, TypeError, ValueError):
+                    log.debug("size_choice_for_key: (KeyError, TypeError, ValueError) caught", exc_info=True)   # remark 81
                     break
     return SizeChoice.box(*PRESET_15X5)
 
@@ -611,6 +615,7 @@ def clamp_dxf_line(width_mm) -> float:
     try:
         v = float(width_mm)
     except (TypeError, ValueError):
+        log.debug("clamp_dxf_line: (TypeError, ValueError) caught", exc_info=True)   # remark 81
         return DEFAULT_DXF_LINE_MM
     if not math.isfinite(v):
         return DEFAULT_DXF_LINE_MM

@@ -1,7 +1,10 @@
+import logging
 import csv
 import re
 from pathlib import Path
 from typing import Dict
+
+log = logging.getLogger(__name__)
 
 _RU_FORM_RE = re.compile(r"\b(one|few|many):?\s*«([^»]*)»")
 
@@ -82,7 +85,7 @@ class I18n:
             try:
                 text = text.format(**kwargs)
             except (KeyError, IndexError, ValueError):
-                pass
+                log.debug("I18n.t: (KeyError, IndexError, ValueError) caught", exc_info=True)   # remark 81
         return text
 
     def tn(self, key: str, n: int, forms_from: str = "", **kwargs) -> str:
@@ -98,5 +101,6 @@ class I18n:
             try:
                 return text.format(**kwargs)
             except (KeyError, IndexError, ValueError):
+                log.debug("I18n.tn: (KeyError, IndexError, ValueError) caught", exc_info=True)   # remark 81
                 return text
         return self.t(key, **kwargs)

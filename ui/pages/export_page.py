@@ -751,10 +751,12 @@ class ExportPage(Box):
         try:
             size = repr(self.size_choice())
         except Exception:
+            log.debug("ExportPage.export_key: Exception caught", exc_info=True)   # remark 81
             size = repr((self.size_key, self.custom_w, self.custom_h))
         try:
             rgb = tuple(self.current_rgb())
         except Exception:
+            log.debug("ExportPage.export_key: Exception caught", exc_info=True)   # remark 81
             rgb = self.color_key
         return (self.selected_formats(), size, self.margin_mm, rgb, self.png_dpi, self.dxf_line_mm,
                 self.svg_mode, self.svg_line_mm)
@@ -791,6 +793,7 @@ class ExportPage(Box):
             sw, sh = self.source.size_px
             return ex.compute_geometry(sw, sh, self.source.dpi, self.size_choice(), self.margin_mm)
         except ValueError:
+            log.debug("ExportPage.geometry_safe: ValueError caught", exc_info=True)   # remark 81
             return None
 
     def size_options(self):
@@ -800,6 +803,7 @@ class ExportPage(Box):
             try:
                 wxh = self.wxh(float(s["w_mm"]), float(s["h_mm"]))
             except (KeyError, TypeError, ValueError):
+                log.debug("ExportPage.size_options: (KeyError, TypeError, ValueError) caught", exc_info=True)   # remark 81
                 continue
             name = str(s.get("name") or "").strip()
             opts.append((ex.TEMPLATE_PREFIX + str(s.get("id")), wxh if not name or name == wxh else f"{name} · {wxh}"))
@@ -850,6 +854,7 @@ class ExportPage(Box):
         try:
             self.margin_mm = float(s.get("crop_margin_mm", ex.DEFAULT_MARGIN_MM))
         except (TypeError, ValueError):
+            log.debug("ExportPage.on_show: (TypeError, ValueError) caught", exc_info=True)   # remark 81
             self.margin_mm = ex.DEFAULT_MARGIN_MM
         self.dxf_line_mm = ex.resolve_dxf_line(last, s.get("dxf_line_mm"))   # remark 50
         # remark 29: Settings › «Форматы по умолчанию» holds the default (svg_mode); the choice made on

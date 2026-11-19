@@ -21,9 +21,21 @@ EX_TITLE_Y = 182      # remark 66: «Исключить цвет» label (centre
 EX_HINT_Y = 202       # first hint line
 
 
-def doubt_text(t, doubts) -> str:
-    """Remark 62: the reasons a photo needs attention, «; »-joined (codes from core.processing.DOUBT_CODES)."""
-    return "; ".join(t("batch.doubt." + c) for c in doubts if c in P.DOUBT_CODES)
+def doubt_text(t, doubts, sep: str = "\n") -> str:
+    """Remark 62: the reasons a photo needs attention (codes from core.processing.DOUBT_CODES).
+    Remark 89: one reason per line inside the yellow card (``sep`` = line break)."""
+    return sep.join(t("batch.doubt." + c) for c in doubts if c in P.DOUBT_CODES)
+
+
+def attention_reason(t, job) -> str:
+    """Remark 89: the second line(s) of the yellow card for the selected photo — «not found» or the doubts."""
+    if job is None:
+        return ""
+    if job.status == "attention":
+        return t("batch.reason_not_found")
+    if job.status == "doubt":
+        return doubt_text(t, job.doubts)
+    return ""
 
 
 class Toolbar(Box):
@@ -389,17 +401,14 @@ class ProcessPage(Box):
         self.c_flat = FilterCard(col, app, "process.filter.flatten", "process.filter.flatten_desc", True,
                                  lambda v: self.set_param(flatten=v))
         self.c_ink = InkCard(col, app, self)
-        self.c_ai = FilterCard(col, app, "process.ai", "process.ai_desc", False, lambda v: self.set_param(ai=v))
         self.c_fine = FineTuneCard(col, app, self)
         self.bar = BottomBar(self, app, app.go_home_confirm if hasattr(app, "go_home_confirm") else
                              (lambda: app.on_step_click(0)), app.go_export)
         self.meta = ""
         # stage 4 (batch)
-        self.reason = InfoBar(self, app, "reason")
         self.skip_bar = InfoBar(self, app, "info", link=app.show_skipped_list, close=app.close_skipped_bar)
         self.warn_bar = InfoBar(self, app, "warn", action=app.show_next_attention)
         self.ok_bar = InfoBar(self, app, "ok")
-        self.note = InfoBar(self, app, "note")           # remarks 62 / 70: reasons under the yellow bar
         self.strip = PhotoStrip(self, app, on_select=app.select_photo, on_add=app.add_photos_dialog,
                                 on_remove=app.ask_remove_photo)
         self.apply_btn = Button(self, app.t("batch.apply_settings_all"), icon="apply_all", bg="bg", command=app.apply_to_all)
@@ -479,7 +488,6 @@ class ProcessPage(Box):
         p = job.state.params
         res = job.result
         self.c_flat.toggle.set(p.flatten)
-        self.c_ai.toggle.set(p.ai)
         self.c_ink.update_state(p, res, self.preview.pipette)
         self.c_fine.set_values(p)
         self.toolbar.undo.set_disabled(not job.history.can_undo())
@@ -579,15 +587,11 @@ class ProcessPage(Box):
         job = self.app.job
         y = 52.0
         bars = []
-        reasons = doubt_text(self.app.t, job.doubts) if job is not None and job.status == "doubt" else ""
+        # remark 89: in every «Требует внимания» case the reason is the second line (one line per reason)
+        # INSIDE the yellow card, like the card of remark 74; no reason bar above the preview (40), no ⚠ line
+        reason = attention_reason(self.app.t, job)
         if b is not None and job is not None:
             t, tn = self.app.t, self.app.tn
-            if job.status == "attention":
-                self.reason.set(t("batch.reason_not_found"))
-                self.reason.layout(24, y, lw)
-                y += 32 + 8
-            else:
-                self.reason.hide()
             if b.skipped_large and not b.skipped_closed:
                 n = len(b.skipped_large)
                 self.skip_bar.set(tn("batch.skipped_large_bar", n), link=t("common.more_info"))
@@ -597,20 +601,14 @@ class ProcessPage(Box):
             state = b.bar_state()
             if state == "warn":
                 n = len(b.attention())
-                # remark 48: «Поправьте их или уберите из пакета, чтобы перейти к экспорту» only while a photo
-                # without a signature blocks export; with doubts only the bar has the title alone
+                # remark 48: «Поправьте их или уберите из пакета, чтобы перейти к экспорту» while a photo without a
+                # signature blocks export; remark 89: the selected photo's reason replaces it when there is one
                 nb = len(b.blocking())
-                hint = tn("batch.attention_hint", 1 if n == 1 else 2) if nb else ""
-                self.warn_bar.set(tn("batch.attention_bar", n), hint, action=t("common.show"))
+                msg = reason or (tn("batch.attention_hint", 1 if n == 1 else 2) if nb else "")
+                self.warn_bar.set(tn("batch.attention_bar", n), msg, action=t("common.show"))
                 bars.append(self.warn_bar)
-                if reasons:
-                    self.note.set(reasons)
-                    bars.append(self.note)
-                else:
-                    self.note.hide()
             else:
                 self.warn_bar.hide()
-                self.note.hide()
             if state == "ok":
                 self.ok_bar.set(t("batch.all_ready"))
                 bars.append(self.ok_bar)
@@ -623,29 +621,17 @@ class ProcessPage(Box):
                 by -= 8 + bar.height()
                 bar.layout(24, by, lw)
             self.meta_y = by - 8 - 12
-        elif job is not None and job.status == "attention":
-            # remark 74: one photo, no signature found — instead of dialog 30 the yellow card with the reason
-            # under the image, where the batch shows its yellow bar (no strip, no «Показать»)
-            for wd in (self.reason, self.skip_bar, self.ok_bar, self.strip, self.note):
+        elif job is not None and reason:
+            # remarks 70 / 74 / 77 / 89: one photo (no strip) — the yellow card «Требует внимания» (no «Показать»)
+            # under the image, where the batch shows its bar, with the reason(s) inside
+            for wd in (self.skip_bar, self.ok_bar, self.strip):
                 wd.hide()
-            self.warn_bar.set(self.app.t("batch.attention"), self.app.t("batch.reason_not_found"), action="")
+            self.warn_bar.set(self.app.t("batch.attention"), reason, action="")
             by = col_h - self.warn_bar.height()
             self.warn_bar.layout(24, by, lw)
             self.meta_y = by - 8 - 12
-        elif job is not None and reasons:
-            # remark 70: one photo (no strip) — the same yellow bar («Требует внимания», no «Показать») above
-            # the image and the reasons under it (help.batch.attention_text)
-            for wd in (self.reason, self.skip_bar, self.ok_bar, self.strip):
-                wd.hide()
-            self.warn_bar.set(self.app.t("batch.attention"), "", action="")
-            self.note.set(reasons)
-            self.warn_bar.layout(24, y, lw)
-            y += self.warn_bar.height() + 8
-            self.note.layout(24, y, lw)
-            y += self.note.height() + 8
-            self.meta_y = col_h - 12
         else:
-            for wd in (self.reason, self.skip_bar, self.warn_bar, self.ok_bar, self.strip, self.note):
+            for wd in (self.skip_bar, self.warn_bar, self.ok_bar, self.strip):
                 wd.hide()
             self.meta_y = col_h - 12
         ph = max(40.0, self.meta_y - 8 - y)
@@ -660,7 +646,7 @@ class ProcessPage(Box):
             return
         x = self.lw - 24 - RIGHT_W
         y = 0.0
-        for c in (self.c_flat, self.c_ink, self.c_ai, self.c_fine):
+        for c in (self.c_flat, self.c_ink, self.c_fine):
             c.layout(0, y, RIGHT_W)
             y += c.height() + 8
         col_h = self.lh - 64 - 16
@@ -692,6 +678,6 @@ class ProcessPage(Box):
             if not res:
                 return
             txt = app.tn("process.meta", res.stroke_count, w=app.fmt_num(res.size_mm[0]), h=app.fmt_num(res.size_mm[1]))
-        if res is not None and res.frame_is_large and not job.state.params.ai and job.status != "attention":
+        if res is not None and res.frame_is_large and job.status != "attention":
             txt += " · " + app.t("process.meta.frame_large")     # remark 69: Help text got longer
         self.text(26, self.meta_y + 6, elide(txt, self.preview.lw - 4, 12), 12, color="muted")

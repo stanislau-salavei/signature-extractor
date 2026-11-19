@@ -24,7 +24,7 @@ class Registry:
                 if b.winfo_exists():
                     b.refresh()
             except tk.TclError:
-                pass
+                log.debug("Registry.refresh_all: tk.TclError caught", exc_info=True)   # remark 81
 
 
 class Box(tk.Canvas):
@@ -219,7 +219,7 @@ class Tooltip:
             try:
                 cls.owner.after_cancel(cls.job)
             except tk.TclError:
-                pass
+                log.debug("Tooltip.cancel: tk.TclError caught", exc_info=True)   # remark 81
         cls.job = None
         cls.owner = None
         if cls.layer:

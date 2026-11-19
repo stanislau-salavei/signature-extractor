@@ -5,6 +5,7 @@ Remark 25 (2026-11-17): an in-window ContentDialog like «О программе�
 inside, footer buttons; Esc cancels, Enter adds)."""
 from __future__ import annotations
 
+import logging
 import colorsys
 import math
 from typing import Callable, Optional, Tuple
@@ -18,6 +19,8 @@ from ui.dialogs.content import ContentDialog
 from ui.theme import S, Scale, Theme, text_width
 from ui.widgets.base import Box
 from ui.widgets.controls import TextBox
+
+log = logging.getLogger(__name__)
 
 W, H = 418, 500
 BOARD_H = 436              # the picker area (title and footer are drawn by ContentDialog)
@@ -126,7 +129,7 @@ class CustomColorDialog(ContentDialog):
             try:
                 start = ex.hex_to_rgb(str(edit["hex"]))
             except Exception:
-                pass
+                log.warning("CustomColorDialog.__init__: Exception caught", exc_info=True)   # remark 81
         r, g, b = (c / 255 for c in start)
         self.h, self.s, self.v = colorsys.rgb_to_hsv(r, g, b)
         self.sig = None
@@ -216,6 +219,7 @@ class CustomColorDialog(ContentDialog):
             vals = tuple(int(f.get()) for f in self.f_rgb)
             return vals if all(0 <= v <= 255 for v in vals) else None
         except ValueError:
+            log.debug("CustomColorDialog._parse: ValueError caught", exc_info=True)   # remark 81
             return None
 
     def _live(self, which):

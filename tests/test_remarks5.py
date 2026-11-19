@@ -14,6 +14,7 @@ import pytest
 from PIL import Image
 
 from core import export as ex
+from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
@@ -44,7 +45,7 @@ def test_i18n_png_res_help_lists_new_dpi():
 
 @pytest.mark.skipif(not PROMPT_CSV.exists(), reason="prompt table not on this machine")
 def test_i18n_csv_identical_to_prompt():
-    assert CSV.read_bytes() == PROMPT_CSV.read_bytes()
+    assert_matches_prompt(CSV, PROMPT_CSV)     # remarks 77–85: approved differences only
 
 
 # ================================================================== 36: DPI

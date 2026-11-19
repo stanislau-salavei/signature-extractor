@@ -128,7 +128,7 @@ class Popup:
         try:
             self.cv.destroy()
         except tk.TclError:
-            pass
+            log.debug("Popup.close: tk.TclError caught", exc_info=True)   # remark 81
         if self.on_close:
             self.on_close()
 
@@ -316,6 +316,13 @@ class ListPopup(Popup):
         x = max(4, min(fx - 4, W - w - 4))
         self.selected = selected
         self.hover_i = -1
+        # remark 79: the list bar widens on hover like the page bars (arrows, track, 1 s delay)
+        self._sb_hover = False
+        self._sb_drag = None
+        self._sb_pressed = False
+        self._sb_repeat = None
+        from ui.widgets.scroll import Widening
+        self.sb = Widening(self.cv, self._sb_redraw, lambda: self._sb_hover or self._sb_drag is not None)
         self.show_base(x, y, w, h, 8)
         self.draw_items()
 
@@ -374,13 +381,69 @@ class ListPopup(Popup):
         if self.content_h > self.ph:
             self._draw_scrollbar()
 
+    # remark 79: Win11 bar (ui/widgets/scroll.py) inside the list, right of the items, 1 px inside the border
+    def _sb_geo(self):
+        from ui.widgets.scroll import bar_geometry
+        return bar_geometry(self.pw - 1, 0.0, self.ph, self.sb.t, self.ph, self.content_h, self.scroll)
+
+    def _sb_in_zone(self, x) -> bool:
+        from ui.widgets.scroll import ZONE_W
+        return x is not None and self.content_h > self.ph and x >= self.pw - 1 - ZONE_W
+
+    def _sb_redraw(self):
+        if not self.closed:
+            self.draw_items()
+
     def _draw_scrollbar(self):
-        track_h = self.ph - 8
-        th = max(24.0, track_h * self.ph / self.content_h)
-        rng = self.content_h - self.ph
-        ty = 4 + (track_h - th) * (self.scroll / rng if rng > 0 else 0)
-        x = self.pw - 4 - 2
-        self.put(x, ty, gfx.rrect(2, th, 1, Theme.c("scroll_thumb"), bg=Theme.c("menu")), tags="items")
+        from ui.widgets.scroll import draw_bar
+        g = self._sb_geo()
+        if g:
+            draw_bar(self.cv, g, self.sb.t, Theme.c("menu"), lambda x, y, key, f: self.put(x, y, f(), tags="items"))
+
+    def _sb_step(self, d, first=False):
+        if self.closed:
+            return
+        from ui.widgets.scroll import REPEAT_FIRST_MS, REPEAT_MS
+        self.wheel(-d)
+        self._sb_repeat = self.root.after(REPEAT_FIRST_MS if first else REPEAT_MS, lambda: self._sb_step(d))
+
+    def _sb_stop(self):
+        if self._sb_repeat is not None:
+            try:
+                self.root.after_cancel(self._sb_repeat)
+            except tk.TclError:
+                log.debug("after_cancel failed", exc_info=True)
+            self._sb_repeat = None
+
+    def press(self, x, y):
+        if not self._sb_in_zone(x):
+            return
+        from ui.widgets.scroll import bar_zone
+        self._sb_pressed = True
+        self.sb.expand()
+        g = self._sb_geo()
+        if not g:
+            return
+        zone = bar_zone(g, y, 0.0, self.ph)
+        if zone == "thumb":
+            self._sb_drag = (y, self.scroll, g["travel"])
+        elif zone in ("up", "down"):
+            self._sb_step(-1 if zone == "up" else 1, first=True)
+        else:
+            page = self.ph - 2 * self.ITEM_H
+            self.scroll = max(0.0, min(self.content_h - self.ph, self.scroll + (page if y > g["thumb"][1] else -page)))
+            self.draw_items()
+
+    def _release(self, e):
+        if self._sb_pressed and not self.closed and not self.inside(e):     # the thumb let go outside the list
+            self.release(None, None)
+            return
+        super()._release(e)
+
+    def close(self) -> None:
+        self.sb.stop()
+        self._sb_stop()
+        super().close()
 
     def _row_at(self, y):
         for top, i in self.rows:
@@ -390,7 +453,20 @@ class ListPopup(Popup):
         return -1
 
     def motion(self, x, y):
-        i = -1 if y is None else self._row_at(y)
+        if self._sb_drag is not None and y is not None:
+            y0, s0, travel = self._sb_drag
+            rng = self.content_h - self.ph
+            self.scroll = max(0.0, min(rng, s0 + (y - y0) * rng / max(1.0, travel)))
+            self.draw_items()
+            return
+        on_bar = self._sb_in_zone(x)
+        if on_bar != self._sb_hover:
+            self._sb_hover = on_bar
+            if on_bar:
+                self.sb.expand()
+            else:
+                self.sb.collapse_later()
+        i = -1 if y is None or on_bar else self._row_at(y)
         if i != self.hover_i:
             self.hover_i = i
             self.draw_items()
@@ -414,6 +490,14 @@ class ListPopup(Popup):
         self.draw_items()
 
     def release(self, x, y, index=None):
+        if self._sb_pressed and index is None:          # remark 79: a click on the bar picks no item
+            self._sb_pressed = False
+            self._sb_drag = None
+            self._sb_stop()
+            if not self._sb_in_zone(x):
+                self._sb_hover = False
+                self.sb.collapse_later()
+            return
         i = self._row_at(y) if index is None else index
         if i >= 0:
             self.close()
@@ -490,5 +574,5 @@ class TooltipLayer:
             try:
                 self.cv.destroy()
             except tk.TclError:
-                pass
+                log.debug("TooltipLayer.hide_tooltip: tk.TclError caught", exc_info=True)   # remark 81
             self.cv = None

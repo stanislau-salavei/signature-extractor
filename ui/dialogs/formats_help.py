@@ -6,6 +6,7 @@ inside, the text scrolls inside the panel (thin Win11 bar, mouse wheel, ↑/↓,
 «Понятно»; Esc and Enter close.  The panel height fits the window (the minimum 1024 × 648 included)."""
 from __future__ import annotations
 
+import logging
 import re
 from typing import List, Tuple
 
@@ -14,6 +15,8 @@ from ui.dialogs.content import ContentDialog, wrap_runs
 from ui.theme import F, S, Theme
 from ui.widgets.base import Box
 from ui.widgets.scroll import ScrollArea
+
+log = logging.getLogger(__name__)
 
 W, SCROLL_H, FOOT_H = 718, 518, 64      # W = content width (panel 720); SCROLL_H = max text area height
 TITLE_H = 24 + 25 + 12                   # body padding + title line + gap above the text
@@ -117,7 +120,6 @@ def _process(t):
             _card("hc_flatten", t("process.filter.flatten"), [_p(k("flatten"))]),
             _card("hc_ink", t("process.filter.ink"), [_p(k("ink")), _lq(k("ink_auto")), _lq(k("ink_manual")),
                                                                  _lq(k("ink_exclude"))]),          # remarks 66, 69
-            _card("hc_ai", t("process.ai"), [_p(k("ai"))]),
             _card("hc_tune", t("process.finetune"), [_p(k("finetune"))] +
                   [_lq(k(x)) for x in ("sensitivity", "denoise", "thickness", "reset")]),
             _card("hc_bg", k("bg"), [_p(k("bg_text"))])]
@@ -417,7 +419,7 @@ class HelpWindow(ContentDialog):
             try:
                 wd.destroy()
             except Exception:
-                pass
+                log.warning("HelpWindow._drop_area: Exception caught", exc_info=True)   # remark 81
 
     def close(self):
         self._drop_area()

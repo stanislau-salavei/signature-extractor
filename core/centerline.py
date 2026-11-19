@@ -7,14 +7,18 @@ Pure numpy (+ cv2 for the distance transform and Douglas–Peucker); no UI impor
 """
 from __future__ import annotations
 
+import logging
 import math
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+log = logging.getLogger(__name__)
+
 try:
     import cv2
 except ImportError:  # pragma: no cover
+    logging.getLogger(__name__).debug("module: ImportError caught", exc_info=True)   # remark 81
     cv2 = None
 
 Pixel = Tuple[int, int]          # (row, col)

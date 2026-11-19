@@ -15,6 +15,7 @@ import pytest
 
 from core import export as ex
 from core import updater as U
+from tests.i18n_prompt_diff import assert_matches_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "i18n" / "strings_ru_en.csv"
@@ -216,16 +217,13 @@ def test_delete_own_colour_from_settings(app):
 
 
 # ------------------------------------------------------------------ 3. issue
-def test_issue_url_has_version_windows_gpu(app, monkeypatch):
+def test_issue_url_has_version_windows_language(app, monkeypatch):
     from ui import platform_win as pw
     monkeypatch.setattr(pw, "windows_version", lambda: "Windows 11 23H2 (build 22631)")
-    monkeypatch.setattr(pw, "gpu_names", lambda: "NVIDIA GeForce RTX 3060")
-    monkeypatch.setenv("SE_FORCE_DX12", "1")
     url = app.issue_url()
     assert url.startswith("https://github.com/") and "/issues/new?body=" in url and "title=" not in url
     body = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["body"][0]
-    assert body.startswith("App version: 1.0\nWindows: Windows 11 23H2 (build 22631)\nGraphics card: NVIDIA GeForce RTX 3060\n")
-    assert "DirectX 12: yes" in body and "Language: ru" in body and body.endswith("Describe the problem:\n")
+    assert body == "App version: 1.0\nWindows: Windows 11 23H2 (build 22631)\nLanguage: ru\n\nDescribe the problem:\n"   # 88
     assert len(url) <= 2000
     opened = []
     monkeypatch.setattr(app, "open_url", opened.append)
@@ -376,23 +374,7 @@ def test_later_and_silent_check_only_on_screen_1(app, tmp_path, monkeypatch):
 
 
 # ------------------------------------------------------------------ 5. DirectX 12
-def test_gpu_toggle_inactive_without_dx12(app, monkeypatch):
-    app.settings.set("gpu_acceleration", True)
-    monkeypatch.setenv("SE_FORCE_DX12", "0")
-    sp = settings(app)
-    h_off = sp.c_gpu.height()
-    assert sp.gpu_toggle.disabled and not sp.gpu_toggle.value
-    assert sp._onoff(sp.gpu_toggle.value) == "Откл."
-    class E:
-        x = y = 2
-    sp.gpu_toggle._on_press(E())
-    sp.gpu_toggle._on_release(E())                # a click on the inactive toggle does nothing
-    assert app.settings.get("gpu_acceleration") is True       # the saved choice stays
-    assert sp.c_gpu.desc_lines()[-1] == "Видеокарта не поддерживает DirectX 12, используется процессор"
-    monkeypatch.setenv("SE_FORCE_DX12", "1")
-    sp.sync()
-    assert not sp.gpu_toggle.disabled and sp.gpu_toggle.value and sp.c_gpu.height() < h_off
-    app.close_settings()
+# remark 78: «Ускорение на видеокарте» is gone with the AI (tests/test_remarks10.py checks it is not there)
 
 
 # ------------------------------------------------------------------ 6. Esc
@@ -440,7 +422,8 @@ def test_language_switch_retranslates_everything(app):
     texts = all_texts(app.root)
     print("EN texts:", len(texts))
     assert len(texts) > 40 and "Settings" in texts and "Add size" in " ".join(texts)
-    left = [s for s in texts if CYR.search(s)]
+    folder = str(app.settings.save_folder(""))       # remark 83: the folder of the first launch stays
+    left = [s for s in texts if CYR.search(s) and s != folder]
     assert left == [], left
     assert app.root.title() == "Signature Extractor"
     app.close_settings()
@@ -496,4 +479,4 @@ def test_stage5_i18n_rows_and_csv_identity():
     assert r["update.downloading"][2:4] == ["Скачивание… {percent} %", "Downloading… {percent}%"]
     assert r["update.download_failed"][2:4] == ["Не удалось скачать обновление", "Couldn't download the update"]
     assert r["issue.body"][2] == r["issue.body"][3] and "\\n" in r["issue.body"][2]
-    assert CSV.read_bytes() == PROMPT_CSV.read_bytes()
+    assert_matches_prompt(CSV, PROMPT_CSV)     # remarks 77–85: approved differences only
