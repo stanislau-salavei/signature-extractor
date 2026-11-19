@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+build/
+dist/
+*.spec
+!packaging/*.spec
+# личные фото и данные для тестов хранятся только локально
+tests/data/
+*.jpg
+*.jpeg
+*.heic
