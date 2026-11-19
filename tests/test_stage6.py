@@ -185,7 +185,8 @@ def test_workflow_builds_on_windows_and_only_drafts():
 
 def test_release_notes_draft():
     t = (ROOT / "docs" / "release_notes" / "v1.0.md").read_text(encoding="utf-8")
-    assert "## Извлечение подписи 1.0" in t and "## Signature Extractor 1.0" in t
+    assert t.startswith("## Извлечение подписи 1.0\n") and "<!--" not in t      # approved, no draft marker
+    assert "## Signature Extractor 1.0" in t
     assert "SignatureExtractor-1.0-setup.exe" in t and "SmartScreen" in t
     assert not re.search(r"\b[0-9a-f]{64}\b", t)     # the checksum is added by the workflow
     assert "AI" not in t.replace("AutoCAD", "") and "DirectX" not in t
