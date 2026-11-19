@@ -115,37 +115,46 @@ def resolve_system_language() -> str:
         return "en"
 
 
+# remark 100 (audit B2): what each setting may hold; the default is in DEFAULT_SETTINGS, keys not listed here
+# take the type of their default.  ("text") str or None, ("dict") dict or None, ("choice", values),
+# ("number", low, high) int / float in range, ("dpi", values), ("formats", values) a list of them, ("int",).
+SETTINGS_SCHEMA: Dict[str, tuple] = {
+    "save_folder": ("text",),
+    "name_template": ("text",),
+    "last_update_check": ("text",),
+    "window": ("dict",),
+    "theme": ("choice", ("system", "light", "dark")),
+    "language": ("choice", ("system", "ru", "en")),
+    "if_exists": ("choice", ("add_number", "replace", "ask")),
+    "png_resolution": ("dpi", PNG_DPI_VALUES),
+    "default_formats": ("formats", ("PNG", "SVG", "DXF")),
+    "crop_margin_mm": ("number", 0, 100),
+    "svg_mode": ("choice", ("original", "stroke")),
+    "dxf_line_mm": ("number", 0.01, 5),
+    "svg_line_mm": ("number", 0.01, 5),
+    "settings_version": ("int",),
+}
+
+
 def _valid(key: str, value: Any) -> bool:
-    d = DEFAULT_SETTINGS[key]
-    if key in ("save_folder", "name_template", "last_update_check"):
+    rule = SETTINGS_SCHEMA.get(key)
+    if rule is None:
+        return isinstance(value, type(DEFAULT_SETTINGS[key]))
+    kind = rule[0]
+    flag = isinstance(value, bool)
+    if kind == "text":
         return value is None or isinstance(value, str)
-    if key == "window":
+    if kind == "dict":
         return value is None or isinstance(value, dict)
-    if key == "theme":
-        return value in ("system", "light", "dark")
-    if key == "language":
-        return value in ("system", "ru", "en")
-    if key == "if_exists":
-        return value in ("add_number", "replace", "ask")
-    if key == "png_resolution":
-        return value in PNG_DPI_VALUES and not isinstance(value, bool)
-    if key == "default_formats":
-        return isinstance(value, list) and all(v in ("PNG", "SVG", "DXF") for v in value)
-    if key == "crop_margin_mm":
-        return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 100
-    if key == "svg_mode":
-        return value in ("original", "stroke")
-    if key in ("dxf_line_mm", "svg_line_mm"):
-        return isinstance(value, (int, float)) and not isinstance(value, bool) and 0.01 <= value <= 5
-    if key == "settings_version":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if isinstance(d, bool):
-        return isinstance(value, bool)
-    if isinstance(d, list):
-        return isinstance(value, list)
-    if isinstance(d, dict):
-        return isinstance(value, dict)
-    return isinstance(value, type(d))
+    if kind == "choice":
+        return value in rule[1]
+    if kind == "dpi":
+        return value in rule[1] and not flag
+    if kind == "formats":
+        return isinstance(value, list) and all(v in rule[1] for v in value)
+    if kind == "number":
+        return isinstance(value, (int, float)) and not flag and rule[1] <= value <= rule[2]
+    return isinstance(value, int) and not flag      # "int"
 
 
 class SettingsManager:

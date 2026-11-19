@@ -818,14 +818,34 @@ def count_strokes(mask: np.ndarray, min_area: int = 4) -> int:
 
 def process(photo: Photo, params: ProcessParams, frame: Optional[Tuple[int, int, int, int]] = None,
             eraser: Sequence[EraserStroke] = ()) -> ProcessResult:
-    """Full pipeline. ``frame`` = user frame (None = automatic). Remark 78: no AI step in v1.0."""
-    h, w = photo.rgb.shape[:2]
+    """Full pipeline. ``frame`` = user frame (None = automatic). Remark 78: no AI step in v1.0.
+
+    Remark 100 (audit B2): ink colour → mask clean-up → frame, thickness, eraser → result and doubts."""
     dark = _darkness(photo, params.flatten)
     alpha = _soft_alpha(dark, params.sensitivity)
     core = alpha > 0.5
+    ink = _ink_stage(photo, params, alpha, core)
+    mask, alpha = _mask_stage(photo, params, ink)
+    pre_frame = mask.copy()          # ink of the whole photo after the filters (remark 48: criteria 3 and 7)
+    fr, auto, alpha, lines, cells = _frame_stage(photo, params, frame, eraser, mask, alpha, ink)
+    return _assemble_result(photo, frame, dark, core, alpha, fr, auto, pre_frame, lines, cells, ink)
 
-    # ink colour
+
+@dataclass
+class _Ink:
+    """Result of :func:`_ink_stage`."""
+    alpha: np.ndarray
+    ink_rgb: Tuple[int, int, int]
+    ink_state: str                 # off | manual | found | same
+    stamp_like: bool
+    tw: Optional[dict] = None      # remark 73: tinted paper
+    alpha_raw: Optional[np.ndarray] = None
+
+
+def _ink_stage(photo: Photo, params: ProcessParams, alpha: np.ndarray, core: np.ndarray) -> _Ink:
+    """Ink colour: manual colour, tinted paper (remark 73) or the auto colour; weights the soft alpha."""
     tw = None
+    alpha_raw = None
     det_rgb, separated, stamp_like = detect_ink_ex(photo, core)
     ink_state = "off"
     ink_rgb = det_rgb or (27, 42, 138)
@@ -853,7 +873,12 @@ def process(photo: Photo, params: ProcessParams, frame: Optional[Tuple[int, int,
                     alpha = alpha * gate
             else:
                 ink_state = "same"
+    return _Ink(alpha, ink_rgb, ink_state, stamp_like, tw, alpha_raw)
 
+
+def _mask_stage(photo: Photo, params: ProcessParams, ink: _Ink) -> Tuple[np.ndarray, np.ndarray]:
+    """Noise removal, plain ruling (remark 72) and the tinted paper clean-up (remark 73) → (mask, alpha)."""
+    alpha, tw = ink.alpha, ink.tw
     mask = alpha >= 0.5
     # noise removal: drop specks smaller than a size driven by the slider (in mm²)
     if params.denoise > 0 and mask.any():
@@ -876,15 +901,23 @@ def process(photo: Photo, params: ProcessParams, frame: Optional[Tuple[int, int,
             alpha[rl | fringe] = 0.0
             mask &= ~rl
     if tw is not None and mask.any():     # remark 73: rejoin cut strokes, drop dashes, dust and ticks
+        from core import tinted as _T
         lp = tw["lines"]
         if rl is not None:
             lp = rl if lp is None else (lp | rl)
-        mask, alpha = _T.clean(mask, alpha, alpha_raw, lp, photo.work_dpi / 25.4, removed=rl)
-    pre_frame = mask.copy()          # ink of the whole photo after the filters (remark 48: criteria 3 and 7)
+        mask, alpha = _T.clean(mask, alpha, ink.alpha_raw, lp, photo.work_dpi / 25.4, removed=rl)
+    return mask, alpha
+
+
+def _frame_stage(photo: Photo, params: ProcessParams, frame, eraser, mask: np.ndarray, alpha: np.ndarray,
+                 ink: _Ink):
+    """Long lines (remark 67), table cells, auto / user frame; then thickness and the eraser.
+    Returns (frame, auto frame, alpha, lines, cells)."""
+    h, w = photo.rgb.shape[:2]
     lines = long_lines(mask, photo.work_dpi / 25.4) if mask.any() else None   # remark 67
     cells = None
-    if ink_state == "found" and tw is not None:
-        cells = table_cells(tw["lines"], photo.work_dpi / 25.4)   # = long_lines(core), already found
+    if ink.ink_state == "found" and ink.tw is not None:
+        cells = table_cells(ink.tw["lines"], photo.work_dpi / 25.4)   # = long_lines(core), already found
     auto = auto_frame_for(mask, photo.work_dpi, lines=lines, find_lines=False, cells=cells)
     fr = clamp_frame(frame if frame is not None else auto, w, h)
     fx, fy, fw, fh = fr
@@ -902,7 +935,15 @@ def process(photo: Photo, params: ProcessParams, frame: Optional[Tuple[int, int,
     er = eraser_mask((h, w), eraser)
     if er is not None:
         alpha = alpha * (1.0 - er.astype(np.float32) / 255.0)
+    return fr, auto, alpha, lines, cells
 
+
+def _assemble_result(photo: Photo, frame, dark, core, alpha, fr, auto, pre_frame, lines, cells,
+                     ink: _Ink) -> ProcessResult:
+    """8-bit alpha, strokes, size, doubts (remark 48) → :class:`ProcessResult`."""
+    h, w = photo.rgb.shape[:2]
+    fx, fy, fw, fh = fr
+    ink_rgb, ink_state, tw = ink.ink_rgb, ink.ink_state, ink.tw
     alpha8 = np.clip(alpha * 255.0 + 0.5, 0, 255).astype(np.uint8)
     mask = alpha8 >= 128
     strokes = count_strokes(mask)
@@ -918,7 +959,7 @@ def process(photo: Photo, params: ProcessParams, frame: Optional[Tuple[int, int,
         try:
             doubts = assess_doubts(photo, dark, mask, fr, pre_frame, ink_rgb if ink_state in ("found", "same") and tw is None else None,
                                    auto_frame=frame is None, core=core,
-                                   stamp_like=stamp_like and ink_state == "found", lines=lines, cells=cells)
+                                   stamp_like=ink.stamp_like and ink_state == "found", lines=lines, cells=cells)
         except Exception:   # a check must never break processing
             log.warning("doubt check failed for %s", photo.name, exc_info=True)
     return ProcessResult(alpha=alpha8, mask=mask, frame=fr, auto_frame=auto, stroke_count=strokes,
