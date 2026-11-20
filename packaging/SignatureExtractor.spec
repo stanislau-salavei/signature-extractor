@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Stage 6: PyInstaller onedir build of «Извлечение подписи / Signature Extractor» (Windows x64).
+# Stage 6: PyInstaller onedir build of «Извлечение подписи» / Signature Extractor (Windows x64).
 # Run through packaging/build.py (it writes build/version_info.txt first):
 #     python packaging/build.py
 # Result: dist/SignatureExtractor/SignatureExtractor.exe + _internal/ (assets, i18n, Python, libraries).

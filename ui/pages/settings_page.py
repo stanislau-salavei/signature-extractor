@@ -40,7 +40,7 @@ PAGE_MAX_W = 1000      # stage 5 (2k_25 / 2k_27): .col {max-width: 1000px; margi
 SIZE_ROW_H = 40         # 36: rows of «Размеры подписи» 40 apart, first centre 24 below the divider
 SIZE_BTN_H = 32
 COLOR_ROW_H = 32        # remark 47 (mockup_colors): colour rows 32 apart
-THEME_ORDER = ("light", "dark", "system")   # as in Win11 Calculator: Светлая, Тёмная, Использовать параметры системы
+THEME_ORDER = ("light", "dark", "system")   # as in Win11 Calculator: «Светлая», «Тёмная», «Использовать параметры системы»
 
 
 class SCard(Box):
@@ -147,15 +147,15 @@ class SettingsPage(Box):
         self.update_note = ""
         self._lic_y = 0.0
 
-        # ------------------------------------------------ Внешний вид
+        # ------------------------------------------------ Appearance («Внешний вид»)
         self.c_theme = SCard(inner, self, "theme", lambda: t("settings.theme"), lambda: t("settings.theme.desc"),
                              expandable=True, body_h=lambda: 115)   # no summary: chevron only, as in Calculator
         self.theme_radios = [Radio(self.c_theme, "", bg="card", command=lambda v=v: self._set_theme(v))
                              for v in THEME_ORDER]
         self.c_lang = SCard(inner, self, "globe", lambda: t("settings.language"), lambda: t("settings.language.desc"))
         self.lang_combo = ComboBox(self.c_lang, app, bg="card", command=self._set_lang)
-        # remark 78: no section «Обработка» (AI-поиск, ускорение на видеокарте) — no AI in v1.0
-        # ------------------------------------------------ Экспорт
+        # remark 78: no section «Обработка» (AI search, GPU acceleration) — no AI in v1.0
+        # ------------------------------------------------ Export («Экспорт»)
         self.c_formats = SCard(inner, self, "formats", lambda: t("settings.formats"), lambda: t("settings.formats.desc"),
                                expandable=True, body_h=lambda: FMT_ROWS_H)   # chevron only (remark 18)
         self.fmt_rows = {}
@@ -195,7 +195,7 @@ class SettingsPage(Box):
         self.c_dpi = SCard(inner, self, "image_dpi", lambda: t("settings.png_resolution"),
                            lambda: t("settings.png_resolution.desc"))
         self.dpi_combo = ComboBox(self.c_dpi, app, bg="card", width=DPI_COMBO_MIN, command=self._set_dpi)
-        # ------------------------------------------------ Сохранение
+        # ------------------------------------------------ Saving («Сохранение»)
         self.c_folder = SCard(inner, self, "folder_set", lambda: t("settings.folder"), lambda: str(self._folder()))
         self.btn_change = Button(self.c_folder, t("common.change_ellipsis"), bg="card", command=self._change_folder)
         self.btn_open = Button(self.c_folder, t("common.open_folder"), bg="card",
@@ -206,7 +206,7 @@ class SettingsPage(Box):
                                 on_apply=self._apply_name)
         self.c_exists = SCard(inner, self, "conflict", lambda: t("settings.if_exists"), lambda: t("settings.if_exists.desc"))
         self.exists_combo = ComboBox(self.c_exists, app, bg="card", command=self._set_exists)
-        # ------------------------------------------------ Сведения
+        # ------------------------------------------------ About («Сведения»)
         self.c_about = SCard(inner, self, None, lambda: t("app.name"), lambda: t("app.description"),
                              summary=lambda: t("settings.version", version=app.VERSION_STR), expandable=True, open_=True, body_h=lambda: 267, logo=True)
         self.about_links = [
@@ -227,7 +227,7 @@ class SettingsPage(Box):
         self.btn_check = Button(self.c_upd, t("settings.check_now"), bg="card", command=self._check_now)
         self.upd_toggle = Toggle(self.c_upd, bool(s.get("check_updates")), bg="card", label_fn=self._onoff,
                                  command=lambda v: s.set("check_updates", v))
-        # ------------------------------------------------ Сброс (remark 37)
+        # ------------------------------------------------ Reset («Сброс», remark 37)
         self.c_reset = SCard(inner, self, "reset", lambda: t("settings.reset.title"))
         self.btn_reset = Button(self.c_reset, t("settings.reset.button"), kind="danger", bg="card",
                                 command=self._confirm_reset)
@@ -439,7 +439,7 @@ class SettingsPage(Box):
         self.app.settings.set("if_exists", ("add_number", "replace", "ask")[i])
 
     def _confirm_reset(self):
-        """Remark 37: «Сбросить настройки?» like «О программе» — red «Сбросить» + «Отмена», Esc = Отмена."""
+        """Remark 37: «Сбросить настройки?» like «О программе» — red «Сбросить» + «Отмена», Esc = «Отмена»."""
         t = self.app.t
         ContentDialog(self.app, t("dialog.reset.title"), t("dialog.reset.body"),
                       [(t("settings.reset.button"), "danger", self.app.reset_settings),

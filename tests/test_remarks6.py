@@ -297,7 +297,7 @@ def test_restart_prompt_follows_saved_snapshot(app, folder):
     assert not app.has_unsaved()
     app.show_page("process")                                # «Назад»
     pump(app, 100)
-    assert not app.has_unsaved()                            # Назад/Далее is not a change
+    assert not app.has_unsaved()                            # «Назад» / «Далее» is not a change
     app.go_export()
     pump(app, 100)
     assert not app.has_unsaved()

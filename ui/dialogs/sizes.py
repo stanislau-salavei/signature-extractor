@@ -1,7 +1,7 @@
 """Signature sizes in Settings (stage 5, mockups 36, 37, 49, 51, 52, 56).
 
 * ``SizeDialog`` — 37 «Добавить размер» / 49 «Изменить размер»: «Название» across, «Ширина, мм» and
-  «Высота, мм» side by side, «Сохранить» + «Отмена» (Esc = Отмена).  Wrong numbers keep the dialog open.
+  «Высота, мм» side by side, «Сохранить» + «Отмена» (Esc = «Отмена»).  Wrong numbers keep the dialog open.
 * ``confirm_delete_size`` — 51 / 56 «Удалить размер «…»?» (red «Удалить», + «По умолчанию станет 15 × 5 мм»
   when the size was the default); used by Settings and by «Удалить шаблон» on screen 3.
 * ``size_label`` / ``add_size`` / ``edit_size`` / ``delete_size`` / ``set_default_size`` — settings data."""

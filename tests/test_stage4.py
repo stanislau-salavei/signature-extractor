@@ -397,7 +397,7 @@ def test_ui_batch_save_writes_all_files(app, folder, tmp_path):
     files = sorted(p.name for p in out.iterdir())
     assert len(files) == 5 * len(fmts)
     assert pg.saved == (5 * len(fmts), out) and app.batch.saved and not pg.dim.active
-    # second run into the same folder, «Если файл уже есть» = Добавить номер
+    # second run into the same folder, «Если файл уже есть» = «Добавить номер»
     pg.changed()
     pg.start_batch_save(out, fmts)
     pump(app, until=lambda: not pg._saving, timeout=40)

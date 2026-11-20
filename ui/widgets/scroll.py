@@ -198,7 +198,7 @@ class BarMixin:
 
 
 class ScrollBar(BarMixin, Control):
-    """Overlay bar of a ScrollArea (Параметры, справка, экран 2, экран 3, окно 21): drag the thumb, click the
+    """Overlay bar of a ScrollArea («Параметры», «Справка», screen 2, screen 3, window 21): drag the thumb, click the
     track to page, the arrows step (and repeat while held), the wheel works over the whole page."""
     W = ZONE_W
 

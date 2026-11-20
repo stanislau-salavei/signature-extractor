@@ -380,7 +380,7 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
 
     # ------------------------------------------------------------------ settings page
     def overlay_open(self) -> bool:
-        """A full-window page (Параметры or Справка) covers the steps."""
+        """A full-window page («Параметры» or «Справка») covers the steps."""
         return self.state.overlay_open()
 
     def open_settings(self):
@@ -736,7 +736,7 @@ class App(KeysMixin, OpenFlowMixin, ReportMixin):
 
     def apply_to_all(self):
         """«Применить настройки ко всем» (remark 38): asks first (dialog like «О программе», blue «Применить» +
-        «Отмена», Esc = Отмена), then the current photo's right-panel settings go to every other photo."""
+        «Отмена», Esc = «Отмена»), then the current photo's right-panel settings go to every other photo."""
         b, job = self.batch, self.job
         if b is None or job is None or self.saving:
             return

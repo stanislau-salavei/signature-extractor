@@ -1,4 +1,4 @@
-"""Извлечение подписи / Signature Extractor — entry point.
+"""«Извлечение подписи» / Signature Extractor — entry point.
 
 Usage: python main.py [--installer-language ru|en] [files or folders ...]
 """

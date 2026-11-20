@@ -116,7 +116,7 @@ def test_size_rows_menus_built_in_and_own(app):
     sp._size_menu(keys.index(ex.SIZE_15X5))
     assert labels(popups().current) == [("Сделать по умолчанию", True)]
     close_all()
-    # 36: own size → Сделать по умолчанию / Изменить / — / Удалить
+    # 36: own size → «Сделать по умолчанию» / «Изменить» / — / «Удалить»
     sp._size_menu(len(opts) - 1)
     assert labels(popups().current) == [("Сделать по умолчанию", False), ("Изменить", False), None, ("Удалить", False)]
     popups().current.items[0].command()

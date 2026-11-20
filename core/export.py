@@ -380,7 +380,7 @@ def _trace_resolution(source: ExportSource, geom: Geometry) -> float:
 
     Remark 40 (2026-11-18): never below the source resolution — the 40 px/mm cap only limits upsampling.
     Downsampling thin strokes (~1 px after resize) let the DXF blur drop them below the 50 % threshold
-    (фото 3 15 × 5: 7.8 mm of centreline instead of ~37 mm)."""
+    (photo 3, 15 × 5: 7.8 mm of centreline instead of ~37 mm)."""
     sw, _ = source.size_px
     src_ppm = sw / max(geom.content_w_mm, 1e-6)
     ppm = max(min(40.0, max(src_ppm, 20.0)), src_ppm)

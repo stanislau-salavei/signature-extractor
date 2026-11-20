@@ -1,4 +1,4 @@
-﻿; Stage 6: per-user Inno Setup 6 installer of «Извлечение подписи / Signature Extractor».
+﻿; Stage 6: per-user Inno Setup 6 installer of «Извлечение подписи» / Signature Extractor.
 ; Built by packaging/build.py:  ISCC /DAppVersion=1.0 /DAppNumVersion=1.0.0.0 packaging\installer.iss
 ; Input: dist\SignatureExtractor\ (PyInstaller onedir).  Output: dist\SignatureExtractor-<ver>-setup.exe.
 ; The file is UTF-8 with BOM (Russian texts).

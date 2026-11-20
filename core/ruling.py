@@ -2,7 +2,7 @@
 without cutting the signature.
 * candidates: straight thin lines ≥ RULE_MIN_MM (opening with line kernels at ±3° around horizontal / vertical);
 * a candidate is ruling if it runs past the other ink of its band by ≥ RULE_PAST_MM on BOTH ends (ruling crosses
-  the signature; a signature's own straight stroke starts or ends inside it — фото 1), or it is a lone line
+  the signature; a signature's own straight stroke starts or ends inside it — photo 1), or it is a lone line
   ≥ RULE_LONE_MM with no other ink in its band;
 * inside a table (``table=True``) every straight line ≥ RULE_MIN_MM goes;
 * where a stroke crosses the line the pixels stay: only line pixels whose run across the line is no thicker
@@ -94,7 +94,7 @@ def ruling(mask: np.ndarray, ppm: float, table: bool = False) -> Optional[np.nda
                     ok = length >= lone
                 else:
                     ok = lo_ <= ys.min() - past and hi_ >= ys.max() + past
-                pass   # (a «spans 60 % of the photo» rule cut tight PNGs: фото 2, IMG_1041)
+                pass   # (a «spans 60 % of the photo» rule cut tight PNGs: photo 2, IMG_1041)
             if DEBUG:
                 log.debug('cand %s %s len %s ok %s', vertical, (x, y, cw, ch), length, ok)
             if not ok:

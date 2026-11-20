@@ -31,7 +31,7 @@ class AppState:
         self.page = name
 
     def overlay_open(self) -> bool:
-        """A full-window page (Параметры or Справка) covers the steps."""
+        """A full-window page («Параметры» or «Справка») covers the steps."""
         return self.settings_open or self.help_open
 
     def has_photos(self) -> bool:

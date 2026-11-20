@@ -2,7 +2,7 @@
 
 The installer / uninstaller never touch this file.  A missing or damaged file is replaced
 by defaults.  ``name_template`` = None means «language default» («подпись_{имя}» / ``signature_{name}``);
-``save_folder`` = None is replaced at the start by Documents\\Подписи / Documents\\Signatures in the language of
+``save_folder`` = None is replaced at the start by «Documents\\Подписи» / «Documents\\Signatures» in the language of
 that launch and then stays (remark 83).
 """
 from __future__ import annotations
@@ -283,7 +283,7 @@ class SettingsManager:
         return Path(v) if v else documents_dir() / folder_name
 
     def fix_save_folder(self, folder_name: str) -> Path:
-        """Remark 83: the default save folder (Documents\\Подписи or Documents\\Signatures, the name from the
+        """Remark 83: the default save folder («Documents\\Подписи» or «Documents\\Signatures», the name from the
         table in the language of that launch) is chosen once — at the first launch or after «Сбросить» — and
         saved, so a later language change does not move the files to another folder.  A folder the user
         already has is used as it is (nothing is renamed or created here)."""

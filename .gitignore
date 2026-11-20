@@ -7,7 +7,7 @@ build/
 dist/
 *.spec
 !packaging/*.spec
-# личные фото и данные для тестов хранятся только локально
+# personal photos and test data are kept locally only
 tests/data/
 *.jpg
 *.jpeg

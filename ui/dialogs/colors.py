@@ -3,7 +3,7 @@
 * ``color_items`` — [(key, name, hex | None, is_custom)] in the order of screen 3: «Как на фото», the
   built-in colours, then the user's own colours.
 * ``add_color`` / ``edit_color`` / ``set_default_color`` — settings data.
-* ``confirm_delete_color`` — «Удалить цвет «{name}»?», red «Удалить» + «Отмена» (Esc = Отмена); when the
+* ``confirm_delete_color`` — «Удалить цвет «{name}»?», red «Удалить» + «Отмена» (Esc = «Отмена»); when the
   colour was the default, the line «По умолчанию станет Синий».  Used by Settings › «Цвет подписи по
   умолчанию» and by «Удалить цвет» / right click on screen 3."""
 from __future__ import annotations
