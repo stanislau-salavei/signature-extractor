@@ -105,9 +105,13 @@ def test_iss_windows_10_1809_x64_only():
 
 def test_iss_name_in_installed_apps_d9():
     t = iss_text()
-    assert '#define AppTitle "Извлечение подписи (Signature Extractor)"' in t
+    # remark 121: the name by the install language; Russian keeps the full D9 name, English is English only
+    assert "ru.AppName=Извлечение подписи (Signature Extractor)" in t.splitlines()
+    assert "en.AppName=Signature Extractor" in t.splitlines()
     s = iss_setup()
-    assert s["AppName"] == s["UninstallDisplayName"] == "{#AppTitle}"
+    assert s["AppName"] == s["UninstallDisplayName"] == "{cm:AppName}"
+    assert s["AppVerName"] == "{cm:AppName} {#AppVersion}"
+    assert "AppTitle" not in t
 
 
 def test_iss_languages_shortcuts_and_language_argument():
@@ -189,7 +193,10 @@ def test_iss_wizard_pages_and_texts():
     # page texts use the short name, the window title keeps the full one with the version
     msgs = t.split("[Messages]", 1)[1].split("[CustomMessages]", 1)[0]
     assert "(Signature Extractor)" not in msgs and "[name" not in msgs
-    assert "WizardForm.Caption := FmtMessage(SetupMessage(msgSetupWindowTitle), ['{#AppTitle} {#AppVersion}'])" in t
+    assert ("WizardForm.Caption := FmtMessage(SetupMessage(msgSetupWindowTitle), "
+            "[ExpandConstant('{cm:AppName}') + ' {#AppVersion}'])") in t
+    en = [l for l in t.splitlines() if l.startswith("en.")]
+    assert not any(ch in l for l in en for ch in "АЕИОУЫЭЮЯаеиоуыэюя")           # no Russian in English texts
     run = [l for l in t.split("[Run]", 1)[1].splitlines() if l.startswith("Filename:")][0]
     assert 'Description: "{cm:LaunchApp}"' in run and "unchecked" not in run       # ticked by default
 

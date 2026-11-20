@@ -402,3 +402,7 @@ Backup: `_backup_before_installer_2026-11-20/` (outside the repository). The des
 - **CI** — after the build, `packaging/installer_screenshots.ps1` installs the program in Russian and English on the runner and saves each wizard page as PNG (artifact `installer-screenshots-<version>`, best effort, never fails the build, not for tags).
 
 Tests: `tests/test_stage6.py` — licence note and link, page texts, image sizes.
+
+## Remark 121 (2026-11-20): the English installer names the program in English
+- `AppName`, `AppVerName` and `UninstallDisplayName` come from the custom message `AppName` of the install language: English — «Signature Extractor» (window title «Setup - Signature Extractor <version>», Setup/Uninstall messages, the «Installed apps» / «Programs and Features» entry), Russian — «Извлечение подписи (Signature Extractor)» as before (D9). `AppId` is constant, so both languages update the same entry; the entry takes the name of the latest install language. Install folder: `Signature Extractor` in both; Start menu shortcut: «Signature Extractor» / «Извлечение подписи».
+- CI screenshots also print the uninstall registry entry (DisplayName, Comments) after each install.

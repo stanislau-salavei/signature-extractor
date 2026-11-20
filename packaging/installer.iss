@@ -10,7 +10,6 @@
   #define AppNumVersion "1.0.0.0"
 #endif
 #define AppExe "SignatureExtractor.exe"
-#define AppTitle "Извлечение подписи (Signature Extractor)"
 #define RepoUrl "https://github.com/stanislau-salavei/signature-extractor"
 ; must equal ui/platform_win.INSTANCE_MUTEX (the running app holds it)
 #define AppMutexName "StanislauSalavei.SignatureExtractor.Running"
@@ -25,10 +24,12 @@
 [Setup]
 ; the same AppId in every version: one entry in «Installed apps», updates install over it
 AppId={{A610AA29-D7B2-4BD1-8564-F1469C0509C5}
-AppName={#AppTitle}
+; the name by the install language (remark 121): window titles, Setup and Uninstall messages and the
+; «Installed apps» / «Programs and Features» entry; Russian keeps the full name (D9), English — «Signature Extractor»
+AppName={cm:AppName}
 AppVersion={#AppVersion}
-AppVerName={#AppTitle} {#AppVersion}
-UninstallDisplayName={#AppTitle}
+AppVerName={cm:AppName} {#AppVersion}
+UninstallDisplayName={cm:AppName}
 UninstallDisplayIcon={app}\{#AppExe}
 AppPublisher=Stanislau Salavei
 AppCopyright=© 2026 Stanislau Salavei
@@ -111,6 +112,8 @@ ru.FinishedLabelNoIcons=Программа «Извлечение подписи
 ru.ClickFinish=Нажмите «Завершить», чтобы закрыть мастер установки.
 
 [CustomMessages]
+en.AppName=Signature Extractor
+ru.AppName=Извлечение подписи (Signature Extractor)
 en.ShortcutName=Signature Extractor
 ru.ShortcutName=Извлечение подписи
 ; the language of the installation becomes the first interface language (stage 1, read_installer_language)
@@ -238,7 +241,7 @@ end;
 procedure InitializeWizard;
 begin
   { with the Welcome page on, Setup would show only AppName in the title }
-  WizardForm.Caption := FmtMessage(SetupMessage(msgSetupWindowTitle), ['{#AppTitle} {#AppVersion}']);
+  WizardForm.Caption := FmtMessage(SetupMessage(msgSetupWindowTitle), [ExpandConstant('{cm:AppName}') + ' {#AppVersion}']);
   if ActiveLanguage = 'en' then
     UseEnglishWizardImage;
   LayOutWelcomePage;
