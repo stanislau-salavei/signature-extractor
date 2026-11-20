@@ -108,6 +108,7 @@ function Find-Button($w, [string[]]$names) {
 function Click-Button($w, [string[]]$names) {
     $b = Find-Button $w $names
     if (-not $b) { throw ("no button " + ($names -join "/") + "; have: " + ((Get-Controls $w | ForEach-Object { $_.Text }) -join ", ")) }
+    "  click: " + $b.Text + "  (buttons: " + ((Get-Controls $w | Where-Object { $_.Text -like "*Button|*" } | ForEach-Object { $_.Text }) -join ", ") + ")"
     [Win]::SendMessage($b.Handle, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null            # BM_CLICK
     Start-Sleep -Milliseconds 1200
 }
