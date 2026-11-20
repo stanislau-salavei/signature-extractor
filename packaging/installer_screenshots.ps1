@@ -100,7 +100,7 @@ function Find-Button($w, [string[]]$names) {
     foreach ($c in Get-Controls $w) {
         $parts = $c.Text -split "\|", 2
         if ($parts[0] -notlike "*Button*" -or $parts[1].StartsWith("(disabled)")) { continue }
-        foreach ($n in $names) { if ($parts[1].StartsWith($n)) { return $c } }
+        foreach ($n in $names) { if ($n -and $parts[1].StartsWith($n)) { return $c } }
     }
     return $null
 }
@@ -161,12 +161,12 @@ function Stop-Setup {
     while (@(Get-Wizards).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
 }
 
-$T = @{
+$ButtonNames = @{
     ru = @{ Next = "Далее"; Install = "Установить"; Finish = "Завершить" }
     en = @{ Next = "Next"; Install = "Install"; Finish = "Finish" }
 }
 foreach ($lang in "ru", "en") {
-    $t = $T[$lang]
+    $t = $ButtonNames[$lang]          # (PowerShell names are case-insensitive: not $T)
     $left = @(Get-Wizards)
     if ($left.Count) { throw "a wizard window is still open: " + $left[0].Current.Name }
     $p = Start-Process -FilePath $Setup -ArgumentList "/LANG=$lang" -PassThru
