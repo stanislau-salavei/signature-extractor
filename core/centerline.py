@@ -462,110 +462,107 @@ def resolve_bridges(nodes, paths, width_px: float):
     the strokes are continued through the bridge: each incoming branch is joined with the
     outgoing branch that keeps its direction best (the shared part is used by both strokes).
     Very short bridges that do not fit this pattern are collapsed into one junction.
+
+    ``nodes`` and ``paths`` are changed in place; one bridge is handled per pass, then the scan
+    starts again, until no bridge changes anything.
     """
-    bridge_max = 8.0 * width_px
-    collapse_max = 1.5 * width_px
-    reach = max(6.0, 2.0 * width_px)
-    centres = {}
-
-    def centre(n):
-        if n not in centres:
-            cl = nodes[n][1]
-            centres[n] = (sum(p[0] for p in cl) / len(cl), sum(p[1] for p in cl) / len(cl))
-        return centres[n]
-
-    def ends_at(n):
-        out = []
-        for i, pth in enumerate(paths):
-            if pth is None:
-                continue
-            if pth[0] == n:
-                out.append((i, 0))
-            if pth[1] == n:
-                out.append((i, 1))
-        return out
-
-    def oriented_from(i, e):
-        """Points of path i starting at its end e."""
-        pts = paths[i][2]
-        return pts if e == 0 else pts[::-1]
-
-    def far_node(i, e):
-        return paths[i][1] if e == 0 else paths[i][0]
-
-    changed = True
-    while changed:
-        changed = False
-        for bi, br in enumerate(paths):
-            if br is None:
-                continue
-            a, b, bpts = br
-            if a is None or b is None or a == b or nodes[a][0] != "junc" or nodes[b][0] != "junc":
-                continue
-            L = _length(bpts)
-            if L > bridge_max:
-                continue
-            ea = [(i, e) for i, e in ends_at(a) if i != bi]
-            eb = [(i, e) for i, e in ends_at(b) if i != bi]
-            if len(ea) != 2 or len(eb) != 2 or len({i for i, _ in ea + eb}) != 4:   # loops: leave to join_chains
-                if L <= collapse_max and len(ea) + len(eb) >= 2:
-                    _collapse(nodes, paths, centres, bi, a, b, centre)
-                    changed = True
-                    break
-                continue
-            ay, ax = centre(a)
-            by, bx = centre(b)
-            u = _unit(by - ay, bx - ax)
-            da = [_outward(oriented_from(i, e), reach) for i, e in ea]
-            db = [_outward(oriented_from(i, e), reach) for i, e in eb]
-            # crossing / merge at a shallow angle: both strokes arrive along the bridge (< 60°)
-            # and leave along it — an «H» cross-bar or a «Ж» does not match
-            fits = all(-(d[0] * u[0] + d[1] * u[1]) > 0.5 for d in da) and \
-                all(d[0] * u[0] + d[1] * u[1] > 0.5 for d in db)
-            # «rung»: two strokes merge at a shallow angle and the skeleton puts a short cross-bar
-            # between them — each junction's own two branches form a straight stroke
-            rung = -(da[0][0] * da[1][0] + da[0][1] * da[1][1]), -(db[0][0] * db[1][0] + db[0][1] * db[1][1])
-            along = sum((-(d[0] * u[0] + d[1] * u[1])) for d in da) / 2 + sum((d[0] * u[0] + d[1] * u[1]) for d in db) / 2
-            if min(rung) >= 0.5 and sum(rung) / 2 > along / 2:
-                new = []
-                for side in (ea, eb):
-                    (i, ei), (j, ej) = side
-                    pts = hermite_join(oriented_from(i, ei)[::-1], oriented_from(j, ej), 1.2 * width_px, reach)
-                    new.append([far_node(i, ei), far_node(j, ej), pts])
-                for i in {bi, ea[0][0], ea[1][0], eb[0][0], eb[1][0]}:
-                    paths[i] = None
-                paths.extend(new)
-                changed = True
-                break
-            if not fits:
-                if L <= collapse_max:
-                    _collapse(nodes, paths, centres, bi, a, b, centre)
-                    changed = True
-                    break
-                continue
-
-            def straight(ia, ib, da=da, db=db):   # arriving direction of branch ia vs leaving direction of ib
-                return -(da[ia][0] * db[ib][0] + da[ia][1] * db[ib][1])
-            pairs = [(0, 0), (1, 1)] if straight(0, 0) + straight(1, 1) >= straight(0, 1) + straight(1, 0) \
-                else [(0, 1), (1, 0)]
-            new = []
-            for ia, ib in pairs:
-                (i, ei), (j, ej) = ea[ia], eb[ib]
-                p_in = oriented_from(i, ei)[::-1]      # far end → a
-                p_out = oriented_from(j, ej)           # b → far end
-                pts = hermite_join(p_in, p_out, 1.2 * width_px, reach)
-                new.append([far_node(i, ei), far_node(j, ej), pts])
-            for i in {bi, ea[0][0], ea[1][0], eb[0][0], eb[1][0]}:
-                paths[i] = None
-            paths.extend(new)
-            changed = True
-            break
+    centres = _Centres(nodes)
+    while _resolve_first_bridge(nodes, paths, centres, width_px):
+        pass
     return [p for p in paths if p is not None]
 
 
-def _collapse(nodes, paths, centres, bi, a, b, centre):
+class _Centres(dict):
+    """Junction centres, computed on first use; a collapsed junction keeps the weighted centre
+    of both clusters (set by ``_collapse``)."""
+
+    def __init__(self, nodes):
+        super().__init__()
+        self.nodes = nodes
+
+    def __missing__(self, n):
+        c = self[n] = _centre(self.nodes[n][1])
+        return c
+
+
+def _resolve_first_bridge(nodes, paths, centres, width_px: float) -> bool:
+    """Handle the first bridge that can be changed; True if something changed."""
+    bridge_max = 8.0 * width_px
+    collapse_max = 1.5 * width_px
+    trim = 1.2 * width_px
+    reach = max(6.0, 2.0 * width_px)
+    for bi, br in enumerate(paths):
+        if br is None:
+            continue
+        a, b, bpts = br
+        if a is None or b is None or a == b or nodes[a][0] != "junc" or nodes[b][0] != "junc":
+            continue
+        length = _length(bpts)
+        if length > bridge_max:
+            continue
+        inc = _incidence(paths)
+        ea = [(i, e) for i, e in inc.get(a, []) if i != bi]      # other branches at each end
+        eb = [(i, e) for i, e in inc.get(b, []) if i != bi]
+        if len(ea) != 2 or len(eb) != 2 or len({i for i, _ in ea + eb}) != 4:   # loops: leave to join_chains
+            if length <= collapse_max and len(ea) + len(eb) >= 2:
+                _collapse(nodes, paths, centres, bi, a, b)
+                return True
+            continue
+        ay, ax = centres[a]
+        by, bx = centres[b]
+        u = _unit(by - ay, bx - ax)                              # along the bridge, a → b
+        da = [_outward(_from_end(paths[i], e), reach) for i, e in ea]
+        db = [_outward(_from_end(paths[i], e), reach) for i, e in eb]
+        if _is_rung(da, db, u):
+            # each junction's own two branches form one stroke; the bridge is dropped
+            _replace_bridge(paths, bi, ea, eb, [(ea[0], ea[1]), (eb[0], eb[1])], trim, reach)
+            return True
+        if not _runs_along(da, db, u):
+            if length <= collapse_max:
+                _collapse(nodes, paths, centres, bi, a, b)
+                return True
+            continue
+        # continue each incoming branch with the outgoing branch that keeps its direction best
+        def straight(ia, ib):   # arriving direction of branch ia vs leaving direction of ib
+            return -_dot(da[ia], db[ib])
+        crossed = not straight(0, 0) + straight(1, 1) >= straight(0, 1) + straight(1, 0)
+        pairs = [(0, 1), (1, 0)] if crossed else [(0, 0), (1, 1)]
+        _replace_bridge(paths, bi, ea, eb, [(ea[ia], eb[ib]) for ia, ib in pairs], trim, reach)
+        return True
+    return False
+
+
+def _runs_along(da, db, u) -> bool:
+    """Crossing / merge at a shallow angle: both strokes arrive along the bridge (< 60°) and leave
+    along it — an «H» cross-bar or a «Ж» does not match.  ``da`` / ``db``: directions from each
+    junction into its branches, ``u``: bridge direction."""
+    return all(-_dot(d, u) > 0.5 for d in da) and all(_dot(d, u) > 0.5 for d in db)
+
+
+def _is_rung(da, db, u) -> bool:
+    """«Rung»: two strokes merge at a shallow angle and the skeleton puts a short cross-bar between
+    them — each junction's own two branches form a straight stroke (straighter than they follow
+    the bridge)."""
+    rung = -_dot(da[0], da[1]), -_dot(db[0], db[1])
+    along = sum((-_dot(d, u)) for d in da) / 2 + sum(_dot(d, u) for d in db) / 2
+    return min(rung) >= 0.5 and sum(rung) / 2 > along / 2
+
+
+def _replace_bridge(paths, bi, ea, eb, pairs, trim: float, reach: float):
+    """Each pair ((i, ei), (j, ej)) of branch ends becomes one path: branch i runs into its node,
+    a Hermite curve, branch j runs out.  The bridge and the four branches are removed."""
+    new = []
+    for (i, ei), (j, ej) in pairs:
+        pts = hermite_join(_to_end(paths[i], ei), _from_end(paths[j], ej), trim, reach)
+        new.append([_far_node(paths[i], ei), _far_node(paths[j], ej), pts])
+    for i in {bi, ea[0][0], ea[1][0], eb[0][0], eb[1][0]}:
+        paths[i] = None
+    paths.extend(new)
+
+
+def _collapse(nodes, paths, centres, bi, a, b):
     """Merge junction b into a (the bridge between them is dropped)."""
-    ca, cb = centre(a), centre(b)
+    ca, cb = centres[a], centres[b]
     na, nb = len(nodes[a][1]), len(nodes[b][1])
     nodes[a] = ("junc", nodes[a][1] + nodes[b][1])
     centres[a] = ((ca[0] * na + cb[0] * nb) / (na + nb), (ca[1] * na + cb[1] * nb) / (na + nb))
@@ -581,97 +578,101 @@ def _collapse(nodes, paths, centres, bi, a, b, centre):
             pth[2][-1] = centres[a]
 
 
-def join_chains(nodes, edges, width_px: float = 0.0) -> List[Tuple[List[Tuple[float, float]], bool]]:
-    """Merge edges through nodes of degree 2; junction ends snap to the cluster centre."""
-    def centre(n):
-        cl = nodes[n][1]
-        return (sum(p[0] for p in cl) / len(cl), sum(p[1] for p in cl) / len(cl))
+def join_chains(nodes, edges, width_px: float = 0.0) -> List[Path]:
+    """Merge edges through nodes of degree 2; junction ends snap to the cluster centre.
 
+    With a stroke width (``width_px > 0``) bridges are resolved first, the straightest pair of
+    branches is continued smoothly through each junction and the branches left there are
+    re-attached.  Returns (points (x, y), closed) per stroke."""
     nodes = dict(nodes)
+    paths = _initial_paths(nodes, edges)
+    if width_px > 0:
+        paths = resolve_bridges(nodes, paths, width_px)
+    smooth_nodes = _join_through_nodes(nodes, paths, width_px)
+    if width_px > 0:
+        for n in smooth_nodes:
+            _reattach(paths, n, 1.2 * width_px, max(6.0, 2.0 * width_px), _centre(nodes[n][1]))
+    return _finish_paths(paths)
+
+
+def _initial_paths(nodes, edges):
+    """Edges as float working paths [(row, col)]; ends at a junction move to its centre."""
     paths = []
     for a, b, px in edges:
         pts = [(float(y), float(x)) for y, x in px]
         if a is not None and nodes[a][0] == "junc":
-            pts[0] = centre(a)
+            pts[0] = _centre(nodes[a][1])
         if b is not None and nodes[b][0] == "junc":
-            pts[-1] = centre(b)
+            pts[-1] = _centre(nodes[b][1])
         paths.append([a, b, pts])
-    if width_px > 0:
-        paths = resolve_bridges(nodes, paths, width_px)
-    def merge(i, ei, j, ej, node=None):
-        pi, pj = paths[i], paths[j]
-        a_pts = pi[2] if ei == 1 else pi[2][::-1]
-        a_start = pi[0] if ei == 1 else pi[1]
-        b_pts = pj[2] if ej == 0 else pj[2][::-1]
-        b_end = pj[1] if ej == 0 else pj[0]
-        paths[i] = None
-        paths[j] = None
-        if width_px > 0 and node is not None and nodes[node][0] == "junc":
-            pts = hermite_join(a_pts, b_pts, 1.2 * width_px, max(6.0, 2.0 * width_px))
-            smooth_nodes.add(node)
-        else:
-            pts = a_pts + b_pts[1:]
-        paths.append([a_start, b_end, pts])
+    return paths
 
-    def outward(i, e, reach=max(6.0, 2.0 * width_px)):
-        """Unit direction from the node into branch ``i`` (end ``e``), measured ``reach`` px along."""
-        pts = paths[i][2] if e == 0 else paths[i][2][::-1]
-        y0, x0 = pts[0]
-        for y, x in pts[1:]:
-            if math.hypot(y - y0, x - x0) >= reach:
-                break
-        dy, dx = y - y0, x - x0
-        n = math.hypot(dy, dx) or 1.0
-        return dy / n, dx / n
 
-    done = set()
-    smooth_nodes = set()
+def _join_through_nodes(nodes, paths, width_px: float) -> set:
+    """Merge paths (in place) through every node with exactly two branches, then through junctions
+    along their straightest pair of branches (no notch at the joint, an «X» crossing becomes two
+    long strokes).  Returns the junctions joined with a smooth curve."""
+    reach = max(6.0, 2.0 * width_px)
+    done: set = set()            # junctions without a straight pair
+    smooth_nodes: set = set()
     while True:
-        inc: Dict[int, List[Tuple[int, int]]] = {}
-        for i, pth in enumerate(paths):
-            if pth is None:
-                continue
-            a, b, _ = pth
-            if a is not None:
-                inc.setdefault(a, []).append((i, 0))
-            if b is not None:
-                inc.setdefault(b, []).append((i, 1))
-        # 1) pass-through nodes: exactly two branches
+        inc = _incidence(paths)
         target = next((n for n, lst in inc.items() if len(lst) == 2 and lst[0][0] != lst[1][0]), None)
         if target is not None:
             (i, ei), (j, ej) = inc[target]
-            merge(i, ei, j, ej, target)
+        else:
+            pick = _straightest_junction(paths, inc, done, reach)
+            if pick is None:
+                break
+            target, (i, ei), (j, ej) = pick
+        if _merge_paths(paths, i, ei, j, ej, nodes, target, width_px):
+            smooth_nodes.add(target)
+    return smooth_nodes
+
+
+def _straightest_junction(paths, inc, done: set, reach: float):
+    """First junction (3+ branches, not in ``done``) with two branches of different paths leaving
+    in nearly opposite directions (cos < −0.6): (node, end, end) of the most opposite pair.
+    Junctions without such a pair are added to ``done``."""
+    for n, lst in inc.items():
+        if n in done or len(lst) < 3:
             continue
-        # 2) junctions: continue the straightest pair of branches through the node (no notch at
-        #    the joint, an «X» crossing becomes two long strokes)
-        best = None
-        for n, lst in inc.items():
-            if n in done or len(lst) < 3:
-                continue
-            dirs = [outward(i, e) for i, e in lst]
-            cand = None
-            for u in range(len(lst)):
-                for v in range(u + 1, len(lst)):
-                    if lst[u][0] == lst[v][0]:
-                        continue
-                    dot = dirs[u][0] * dirs[v][0] + dirs[u][1] * dirs[v][1]
-                    if dot < -0.6 and (cand is None or dot < cand[0]):
-                        cand = (dot, u, v)
-            if cand is None:
-                done.add(n)
-                continue
-            best = (n, lst[cand[1]], lst[cand[2]])
-            break
-        if best is None:
-            break
-        n, (i, ei), (j, ej) = best
-        merge(i, ei, j, ej, n)
-    if width_px > 0:
-        for n in smooth_nodes:
-            _reattach(paths, n, 1.2 * width_px, max(6.0, 2.0 * width_px), centre(n))
-    paths = [p for p in paths if p is not None]
+        dirs = [_outward(_from_end(paths[i], e), reach) for i, e in lst]
+        cand = None
+        for u in range(len(lst)):
+            for v in range(u + 1, len(lst)):
+                if lst[u][0] == lst[v][0]:
+                    continue
+                dot = _dot(dirs[u], dirs[v])
+                if dot < -0.6 and (cand is None or dot < cand[0]):
+                    cand = (dot, u, v)
+        if cand is None:
+            done.add(n)
+            continue
+        return n, lst[cand[1]], lst[cand[2]]
+    return None
+
+
+def _merge_paths(paths, i, ei, j, ej, nodes, node, width_px: float) -> bool:
+    """Replace paths i and j (meeting at ``node`` with ends ei, ej) by one appended path.  At a
+    junction with a stroke width the joint is a Hermite curve; returns True in that case."""
+    a_pts, a_start = _to_end(paths[i], ei), _far_node(paths[i], ei)
+    b_pts, b_end = _from_end(paths[j], ej), _far_node(paths[j], ej)
+    paths[i] = None
+    paths[j] = None
+    smooth = width_px > 0 and nodes[node][0] == "junc"
+    if smooth:
+        pts = hermite_join(a_pts, b_pts, 1.2 * width_px, max(6.0, 2.0 * width_px))
+    else:
+        pts = a_pts + b_pts[1:]
+    paths.append([a_start, b_end, pts])
+    return smooth
+
+
+def _finish_paths(paths) -> List[Path]:
+    """Live working paths → (points (x, y), closed); a closed path does not repeat its first point."""
     out = []
-    for a, b, pts in paths:
+    for a, b, pts in (p for p in paths if p is not None):
         closed = (a is None and b is None and len(pts) > 2 and pts[0] == pts[-1]) or (a is not None and a == b)
         if closed and pts[0] == pts[-1]:
             pts = pts[:-1]
