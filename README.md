@@ -1,7 +1,7 @@
 # signature-extractor
 
-«Извлечение подписи» / Signature Extractor 1.0 — Windows-программа, которая из фото или скана подписи делает чистые PNG, SVG и DXF. Лицензия GNU GPLv3.
+«Извлечение подписи» / Signature Extractor 1.0 is a Windows program that turns a photo or scan of a signature into clean PNG, SVG and DXF files. License: GNU GPLv3.
 
-- Запуск из исходников: `pip install -r requirements.txt`, `python main.py`.
-- Тесты: `pip install -r requirements-dev.txt`, `python -m pytest -q tests` (тесты с личными фото без них пропускаются).
-- Установщик (Windows x64): `pip install -r requirements.txt -r packaging/requirements-build.txt -c packaging/constraints-win.txt` (точные версии сборки), установить Inno Setup 6, `python packaging/build.py` → `dist/SignatureExtractor-<ver>-setup.exe` и `.sha256`. То же делает GitHub Actions (`.github/workflows/build-installer.yml`).
+- Run from source: `pip install -r requirements.txt`, `python main.py`.
+- Tests: `pip install -r requirements-dev.txt`, `python -m pytest -q tests` (tests that need personal photos are skipped without them).
+- Installer (Windows x64): `pip install -r requirements.txt -r packaging/requirements-build.txt -c packaging/constraints-win.txt` (exact build versions), install Inno Setup 6, `python packaging/build.py` → `dist/SignatureExtractor-<ver>-setup.exe` and `.sha256`. GitHub Actions does the same (`.github/workflows/build-installer.yml`).

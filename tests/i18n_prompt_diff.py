@@ -2,7 +2,7 @@
 a copy of /workspace/prompt/v2 — remark 91).
 
 Since remarks 77–85 (2026-11-19) the prompt table is no longer edited: the project CSV keeps every other row
-exactly as in the prompt copy, and only these rows differ (listed in NOTES.md, «Замечания 77–85», «86–89», «90–91»)."""
+exactly as in the prompt copy, and only these rows differ (listed in NOTES.md, «Remarks 77–85», «86–89», «90–91»)."""
 import csv
 import io
 import os
