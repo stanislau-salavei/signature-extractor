@@ -188,59 +188,116 @@ def skeleton_graph(sk: np.ndarray):
     return nodes, edges
 
 
+# --------------------------------------------------------------------------- working paths
+# An edge / working path is a mutable list ``[start_node, end_node, points]``; ``e`` names one of
+# its ends (0 = start, 1 = end).  A ``None`` node is a loose end (or both ends of a closed loop).
+
+def _from_end(pth, e):
+    """Points of ``pth`` running away from its end ``e``."""
+    return pth[2] if e == 0 else pth[2][::-1]
+
+
+def _to_end(pth, e):
+    """Points of ``pth`` running towards its end ``e``."""
+    return pth[2] if e == 1 else pth[2][::-1]
+
+
+def _far_node(pth, e):
+    """Node at the other end of ``pth``, seen from its end ``e``."""
+    return pth[1] if e == 0 else pth[0]
+
+
+def _centre(cluster) -> Tuple[float, float]:
+    """Mean (row, col) of a node's pixel cluster."""
+    return (sum(p[0] for p in cluster) / len(cluster), sum(p[1] for p in cluster) / len(cluster))
+
+
+def _dot(a, b) -> float:
+    return a[0] * b[0] + a[1] * b[1]
+
+
+def _incidence(paths) -> Dict[int, List[Tuple[int, int]]]:
+    """node → [(path index, end)] for every end of a live path that lies on a node (path order)."""
+    inc: Dict[int, List[Tuple[int, int]]] = {}
+    for i, pth in enumerate(paths):
+        if pth is None:
+            continue
+        if pth[0] is not None:
+            inc.setdefault(pth[0], []).append((i, 0))
+        if pth[1] is not None:
+            inc.setdefault(pth[1], []).append((i, 1))
+    return inc
+
+
+# --------------------------------------------------------------------------- stitching
 def stitch_edges(edges, nodes=None, attach_px: float = 0.0):
     """Two walks can meet in the middle of one stroke and both stop there with a ``None`` end:
     join such halves back into one edge (their loose end pixels touch).  A loose end left over
     that lies within ``attach_px`` of a junction is attached to it (the walk stopped on a pixel
     of a neighbouring edge, just next to the junction)."""
     edges = [list(e) for e in edges]
-    changed = True
-    while changed:
-        changed = False
-        loose = []
-        for i, (a, b, px) in enumerate(edges):
-            if a is None and b is None:
-                continue
-            if a is None:
-                loose.append((i, 0, px[0]))
-            if b is None:
-                loose.append((i, 1, px[-1]))
-        for u in range(len(loose)):
-            for v in range(u + 1, len(loose)):
-                (i, ei, p), (j, ej, q) = loose[u], loose[v]
-                if i == j or max(abs(p[0] - q[0]), abs(p[1] - q[1])) > 1:
-                    continue
-                pi = edges[i][2] if ei == 1 else edges[i][2][::-1]      # ... → loose end
-                pj = edges[j][2] if ej == 0 else edges[j][2][::-1]      # loose end → ...
-                start = edges[i][0] if ei == 1 else edges[i][1]
-                end = edges[j][1] if ej == 0 else edges[j][0]
-                if pi[-1] == pj[0]:
-                    pj = pj[1:]
-                merged = [start, end, pi + pj]
-                edges = [e for k, e in enumerate(edges) if k not in (i, j)] + [merged]
-                changed = True
-                break
-            if changed:
-                break
+    while True:
+        pair = _touching_loose_ends(edges)
+        if pair is None:
+            break
+        edges = _join_halves(edges, *pair)
     if nodes and attach_px > 0:
-        juncs = [(n, cl) for n, (k, cl) in nodes.items() if k == "junc"]
-        for e in edges:
-            if (e[0] is None) == (e[1] is None):
-                continue
-            ei = 0 if e[0] is None else 1
-            p = e[2][0] if ei == 0 else e[2][-1]
-            best = None
-            for n, cl in juncs:
-                if n == e[1 - ei]:
-                    continue
-                q = min(cl, key=lambda c: (c[0] - p[0]) ** 2 + (c[1] - p[1]) ** 2)
-                d = math.hypot(q[0] - p[0], q[1] - p[1])
-                if d <= attach_px and (best is None or d < best[0]):
-                    best = (d, n, q)
-            if best is not None:
-                e[ei] = best[1]
-                e[2] = [best[2]] + e[2] if ei == 0 else e[2] + [best[2]]
+        _attach_to_junctions(edges, nodes, attach_px)
     return edges
+
+
+def _touching_loose_ends(edges):
+    """The first two loose ends of different edges whose pixels touch: ((i, end), (j, end)) or None.
+    Edges with no node at all (closed loops) are skipped."""
+    loose = []
+    for i, (a, b, px) in enumerate(edges):
+        if a is None and b is None:
+            continue
+        if a is None:
+            loose.append((i, 0, px[0]))
+        if b is None:
+            loose.append((i, 1, px[-1]))
+    for u in range(len(loose)):
+        i, ei, p = loose[u]
+        for v in range(u + 1, len(loose)):
+            j, ej, q = loose[v]
+            if i != j and max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 1:
+                return (i, ei), (j, ej)
+    return None
+
+
+def _join_halves(edges, end_i, end_j):
+    """Edges i and j joined at their touching loose ends; the merged edge goes to the end of the list."""
+    (i, ei), (j, ej) = end_i, end_j
+    pi = _to_end(edges[i], ei)            # ... → loose end
+    pj = _from_end(edges[j], ej)          # loose end → ...
+    if pi[-1] == pj[0]:
+        pj = pj[1:]
+    merged = [_far_node(edges[i], ei), _far_node(edges[j], ej), pi + pj]
+    return [e for k, e in enumerate(edges) if k not in (i, j)] + [merged]
+
+
+def _attach_to_junctions(edges, nodes, attach_px: float):
+    """An edge with one loose end within ``attach_px`` of a junction (other than the node at its
+    other end) gets that end attached to the nearest pixel of the nearest such junction (in place)."""
+    juncs = [(n, cl) for n, (k, cl) in nodes.items() if k == "junc"]
+    for e in edges:
+        if (e[0] is None) == (e[1] is None):
+            continue
+        ei = 0 if e[0] is None else 1
+        p = e[2][0] if ei == 0 else e[2][-1]
+        best = None
+        for n, cl in juncs:
+            if n == e[1 - ei]:
+                continue
+            q = min(cl, key=lambda c: (c[0] - p[0]) ** 2 + (c[1] - p[1]) ** 2)
+            d = math.hypot(q[0] - p[0], q[1] - p[1])
+            if d <= attach_px and (best is None or d < best[0]):
+                best = (d, n, q)
+        if best is not None:
+            _, n, q = best
+            e[ei] = n
+            e[2] = [q] + e[2] if ei == 0 else e[2] + [q]
 
 
 def _degrees(edges) -> Dict[int, int]:
