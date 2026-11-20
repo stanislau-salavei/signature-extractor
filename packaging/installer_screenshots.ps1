@@ -13,6 +13,24 @@ public static class Win {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT r);
     [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out RECT r, int size);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, System.Text.StringBuilder l);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
+    public delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc f, IntPtr l);
+    // visible child windows as "class|text" (text via WM_GETTEXT)
+    public static System.Collections.Generic.List<string> Children(IntPtr parent, System.Collections.Generic.List<IntPtr> handles) {
+        var list = new System.Collections.Generic.List<string>();
+        EnumChildWindows(parent, (h, l) => {
+            if (!IsWindowVisible(h)) return true;
+            var c = new System.Text.StringBuilder(256); GetClassName(h, c, 256);
+            int n = (int)SendMessage(h, 0x000E, IntPtr.Zero, IntPtr.Zero);
+            var t = new System.Text.StringBuilder(n + 1); SendMessage(h, 0x000D, (IntPtr)(n + 1), t);
+            list.Add(c + "|" + (IsWindowEnabled(h) ? "" : "(disabled)") + t); handles.Add(h); return true; }, IntPtr.Zero);
+        return list;
+    }
 }
 "@
 $UIA = [System.Windows.Automation.AutomationElement]
@@ -49,22 +67,33 @@ function Save-Shot($w, [string]$name) {
     $out.Dispose()
 }
 
-function Get-Buttons($w) {
-    $c = New-Object System.Windows.Automation.PropertyCondition($UIA::ControlTypeProperty, $CT::Button)
-    $w.FindAll($Tree::Descendants, $c) | Where-Object { -not $_.Current.IsOffscreen -and $_.Current.IsEnabled }
+function Get-Controls($w) {
+    $h = New-Object System.Collections.Generic.List[IntPtr]
+    $names = [Win]::Children([IntPtr]$w.Current.NativeWindowHandle, $h)
+    for ($i = 0; $i -lt $names.Count; $i++) { [pscustomobject]@{ Handle = $h[$i]; Text = ($names[$i] -replace "&", "") } }
+}
+
+# a visible, enabled button whose text starts with one of the names («Далее» / «Next», with or without « >»)
+function Find-Button($w, [string[]]$names) {
+    foreach ($c in Get-Controls $w) {
+        $parts = $c.Text -split "\|", 2
+        if ($parts[0] -notlike "*Button*" -or $parts[1].StartsWith("(disabled)")) { continue }
+        foreach ($n in $names) { if ($parts[1].StartsWith($n)) { return $c } }
+    }
+    return $null
 }
 
 function Click-Button($w, [string[]]$names) {
-    $b = Get-Buttons $w | Where-Object { ($_.Current.Name -replace "&", "") -in $names } | Select-Object -First 1
-    if (-not $b) { throw ("no button " + ($names -join "/") + "; have: " + ((Get-Buttons $w | ForEach-Object { $_.Current.Name }) -join ", ")) }
-    $b.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $b = Find-Button $w $names
+    if (-not $b) { throw ("no button " + ($names -join "/") + "; have: " + ((Get-Controls $w | ForEach-Object { $_.Text }) -join ", ")) }
+    [Win]::SendMessage($b.Handle, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null            # BM_CLICK
     Start-Sleep -Milliseconds 1200
 }
 
 function Wait-Button($w, [string[]]$names, [int]$TimeoutS) {
     $end = (Get-Date).AddSeconds($TimeoutS)
     while ((Get-Date) -lt $end) {
-        if (Get-Buttons $w | Where-Object { ($_.Current.Name -replace "&", "") -in $names }) { return }
+        if (Find-Button $w $names) { return }
         Start-Sleep -Milliseconds 500
     }
     throw ("timeout waiting for " + ($names -join "/"))
@@ -77,8 +106,8 @@ function Stop-Setup {
 }
 
 $T = @{
-    ru = @{ Next = "Далее >"; Install = "Установить"; Finish = "Завершить" }
-    en = @{ Next = "Next >"; Install = "Install"; Finish = "Finish" }
+    ru = @{ Next = "Далее"; Install = "Установить"; Finish = "Завершить" }
+    en = @{ Next = "Next"; Install = "Install"; Finish = "Finish" }
 }
 foreach ($lang in "ru", "en") {
     $t = $T[$lang]
@@ -87,9 +116,9 @@ foreach ($lang in "ru", "en") {
         $w = Find-Wizard
         "[$lang] title: " + $w.Current.Name
         Save-Shot $w "${lang}_1_welcome"
-        $links = $w.FindAll($Tree::Descendants, (New-Object System.Windows.Automation.PropertyCondition($UIA::ControlTypeProperty, $CT::Hyperlink)))
-        foreach ($l in $links) { "[$lang] link: '" + $l.Current.Name + "' invoke=" + [bool]($l.GetSupportedPatterns() | Where-Object { $_.ProgrammaticName -like "Invoke*" }) }
-        if (-not $links -or $links.Count -eq 0) { "[$lang] link: NONE" }
+        Get-Controls $w | ForEach-Object { "[$lang]   control: " + $_.Text }
+        $link = Get-Controls $w | Where-Object { $_.Text -like "SysLink|*" }
+        "[$lang] link control: " + $(if ($link) { "SysLink, " + (($link.Text -split "\|", 2)[1]) } else { "NONE" })
         Click-Button $w @($t.Next)
         Save-Shot $w "${lang}_2_tasks"
         Click-Button $w @($t.Next)

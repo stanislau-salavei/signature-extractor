@@ -218,8 +218,9 @@ begin
   LicenseLink.Left := WizardForm.WelcomeLabel2.Left;
   LicenseLink.Top := WizardForm.WelcomeLabel2.Top + WizardForm.WelcomeLabel2.Height + Gap;
   LicenseLink.Width := WizardForm.WelcomeLabel2.Width;
-  { one line: a [Code] line starting with «[» would be read as a section tag }
-  LicenseLink.Caption := FmtMessage(CustomMessage('LicenseNote'), ['<a href="{#LicenseUrl}">{#LicenseUrl}</a>']);
+  { the link starts a new line so that it is not broken in the middle; one line: a [Code] line starting
+    with «[» would be read as a section tag }
+  LicenseLink.Caption := FmtMessage(CustomMessage('LicenseNote'), [#13#10 + '<a href="{#LicenseUrl}">{#LicenseUrl}</a>']);
   LicenseLink.OnLinkClick := @LicenseLinkClick;
   WizardForm.AdjustLinkLabelHeight(LicenseLink);
 
