@@ -189,4 +189,15 @@ foreach ($lang in "ru", "en") {
         Stop-Setup                       # do not press «Finish»: it would start the program
         if (-not $p.HasExited) { $p.Kill() }
     }
+    # what Windows shows in «Installed apps» / «Programs and Features», and the Start menu shortcut
+    $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{A610AA29-D7B2-4BD1-8564-F1469C0509C5}_is1"
+    $u = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+    if ($u) {
+        "[$lang] registry DisplayName: " + $u.DisplayName
+        "[$lang] registry DisplayVersion: " + $u.DisplayVersion + "; Comments: " + $u.Comments
+        "[$lang] registry InstallLocation: " + $u.InstallLocation + "; Inno Setup: Language: " + $u."Inno Setup: Language"
+    } else { "[$lang] registry: no uninstall entry" }
+    $menu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
+    Get-ChildItem $menu -Filter *.lnk | Where-Object { $_.Name -match "Signature|подписи" } |
+        ForEach-Object { "[$lang] Start menu shortcut: " + $_.Name }
 }
