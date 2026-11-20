@@ -523,13 +523,17 @@ def _resolve_first_bridge(nodes, paths, centres, width_px: float) -> bool:
                 return True
             continue
         # continue each incoming branch with the outgoing branch that keeps its direction best
-        def straight(ia, ib):   # arriving direction of branch ia vs leaving direction of ib
-            return -_dot(da[ia], db[ib])
-        crossed = not straight(0, 0) + straight(1, 1) >= straight(0, 1) + straight(1, 0)
-        pairs = [(0, 1), (1, 0)] if crossed else [(0, 0), (1, 1)]
+        pairs = [(0, 1), (1, 0)] if _crossed(da, db) else [(0, 0), (1, 1)]
         _replace_bridge(paths, bi, ea, eb, [(ea[ia], eb[ib]) for ia, ib in pairs], trim, reach)
         return True
     return False
+
+
+def _crossed(da, db) -> bool:
+    """True if branch 0 at junction a continues best into branch 1 at b (and 1 into 0)."""
+    def straight(ia, ib):   # arriving direction of branch ia vs leaving direction of ib
+        return -_dot(da[ia], db[ib])
+    return not straight(0, 0) + straight(1, 1) >= straight(0, 1) + straight(1, 0)
 
 
 def _runs_along(da, db, u) -> bool:
