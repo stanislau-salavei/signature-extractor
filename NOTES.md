@@ -393,3 +393,12 @@ Backup: `_backup_before_remark93_2026-11-19/`. No new i18n strings.
 - `api_url()` trims spaces, quotes (`"`, `'`, «», “”, ‘’), NBSP, BOM and zero-width characters at the edges; a value that is still not an http(s) address after that (or has a space inside) is rejected with a warning in the log, and the project address is used.
 
 Tests: `tests/test_remark93.py` (local HTTP server: 404/403/500/broken JSON/connection refused, value trimming, warnings, controller without Tk).
+
+## Installer polish (2026-11-20, «Вноси изменения»)
+Backup: `_backup_before_installer_2026-11-20/` (outside the repository). The design mockups are not in the repository.
+- **Images** — `packaging/installer/`: the left panel of the Welcome and Finished pages (`wizard_image_ru_*.png`, `wizard_image_en_*.png`: app icon, program name, «PNG · SVG · DXF», a synthetic signature on a pale blue background) and the icon of the inner pages (`wizard_small_*.png`: app icon with a transparent margin), PNG in all Inno Setup 6.6 DPI sizes (7 + 7 + 7). `WizardImageFile` takes the Russian images; for English installs `[Code]` loads the English image of the nearest size. Requires Inno Setup 6.6+ (`#error` otherwise).
+- **Pages** — the Welcome page is on (`DisableWelcomePage=no`): what the program does, «no administrator rights», a short GPLv3 note with a clickable link (`TNewLinkLabel`) instead of the full licence page (`InfoBeforeFile` removed; `LICENSE.txt` is still installed). The Ready page lists the install folder (`AlwaysShowDirOnReadyPage=yes`, the folder page stays hidden). Finished: «Установка завершена», the «Запустить программу» check box is ticked. Page texts use the short name «Извлечение подписи» / «Signature Extractor»; the window title keeps «Установка — Извлечение подписи (Signature Extractor) <version>».
+- **Programs and Features** — `AppComments` (RU/EN, by the install language).
+- **CI** — after the build, `packaging/installer_screenshots.ps1` installs the program in Russian and English on the runner and saves each wizard page as PNG (artifact `installer-screenshots-<version>`, best effort, never fails the build, not for tags).
+
+Tests: `tests/test_stage6.py` — licence note and link, page texts, image sizes.

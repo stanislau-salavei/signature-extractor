@@ -150,13 +150,70 @@ def test_iss_running_app_and_settings_untouched():
     assert "settings.json" not in low.replace("; %appdata%\\signature extractor (settings.json, log) is never touched (no uninstall-delete entries)", "")
 
 
-def test_iss_license_page_read_only_d6():
+def test_iss_license_note_with_link_no_license_page():
+    """Installer polish (2026-11-20): no full licence page, a short note with a clickable link on the Welcome page."""
     s = iss_setup()
-    assert s["InfoBeforeFile"] == r"..\LICENSE" and "LicenseFile" not in s
+    assert "InfoBeforeFile" not in s and "LicenseFile" not in s
     assert "GNU GENERAL PUBLIC LICENSE" in (ROOT / "LICENSE").read_text(encoding="utf-8")[:200]
     t = iss_text()
     assert 'Source: "..\\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"' in t
     assert 'Source: "..\\dist\\SignatureExtractor\\*"' in t
+    assert '#define LicenseUrl "https://www.gnu.org/licenses/gpl-3.0.html"' in t
+    assert ("ru.LicenseNote=«Извлечение подписи» — свободная программа под лицензией GNU GPL версии 3. "
+            "Полный текст: %1 и файл LICENSE в папке программы.") in t
+    assert "en.LicenseNote=Signature Extractor is free software under the GNU GPL, version 3." in t
+    code = t.split("[Code]", 1)[1]
+    assert "TNewLinkLabel.Create" in code and "OnLinkClick := @LicenseLinkClick" in code
+    assert '<a href="{#LicenseUrl}">{#LicenseUrl}</a>' in code and "ShellExecAsOriginalUser('open', Link" in code
+
+
+def test_iss_wizard_pages_and_texts():
+    s = iss_setup()
+    t = iss_text()
+    assert s["WizardStyle"] == "modern"
+    assert s["DisableWelcomePage"] == "no" and s["DisableReadyPage"] == "no"
+    assert s["DisableDirPage"] == "yes" and s["AlwaysShowDirOnReadyPage"] == "yes"
+    assert s["AppComments"] == "{cm:AppComments}" and "ru.AppComments=" in t and "en.AppComments=" in t
+    nb = "\u00a0"
+    for line in ("ru.WelcomeLabel1=Установка программы «Извлечение" + nb + "подписи»",
+                 "ru.WelcomeLabel2=Программа делает из фото или скана подписи чистые файлы PNG, SVG и DXF. "
+                 "Всё обрабатывается на вашем компьютере.%n%nПрава администратора не нужны: "
+                 "программа ставится только для вашей учётной записи.",
+                 "ru.ClickNext=Нажмите «Далее», чтобы продолжить.",
+                 "ru.FinishedHeadingLabel=Установка завершена",
+                 "ru.FinishedLabel=Программа «Извлечение подписи» установлена. Её можно открыть из меню «Пуск».",
+                 "ru.ClickFinish=Нажмите «Завершить», чтобы закрыть мастер установки.",
+                 "ru.LaunchApp=Запустить программу", "en.LaunchApp=Launch the program",
+                 "en.FinishedHeadingLabel=Setup is complete"):
+        assert line in t.splitlines(), line
+    # page texts use the short name, the window title keeps the full one with the version
+    msgs = t.split("[Messages]", 1)[1].split("[CustomMessages]", 1)[0]
+    assert "(Signature Extractor)" not in msgs and "[name" not in msgs
+    assert "WizardForm.Caption := FmtMessage(SetupMessage(msgSetupWindowTitle), ['{#AppTitle} {#AppVersion}'])" in t
+    run = [l for l in t.split("[Run]", 1)[1].splitlines() if l.startswith("Filename:")][0]
+    assert 'Description: "{cm:LaunchApp}"' in run and "unchecked" not in run       # ticked by default
+
+
+def test_iss_wizard_images_all_dpi_sizes():
+    from PIL import Image
+    s = iss_setup()
+    assert s["WizardImageFile"] == r"installer\wizard_image_ru_*.png"
+    assert s["WizardSmallImageFile"] == r"installer\wizard_small_*.png"
+    assert 'Source: "installer\\wizard_image_en_*.png"; Flags: dontcopy' in iss_text()
+    d = PKG / "installer"
+    wide = [(202, 386), (269, 515), (336, 643), (403, 772), (430, 824), (498, 953), (551, 1055)]  # Inno 6.6 table
+    for lang in ("ru", "en"):
+        for w, h in wide:
+            with Image.open(d / f"wizard_image_{lang}_{w}x{h}.png") as im:
+                assert im.format == "PNG" and im.size == (w, h)
+    for n in (58, 77, 97, 116, 124, 143, 159):
+        with Image.open(d / f"wizard_small_{n}x{n}.png") as im:
+            assert im.format == "PNG" and im.size == (n, n) and im.mode == "RGBA"
+            assert im.getpixel((0, 0))[3] == 0                    # transparent margin around the icon
+    names = sorted(p.name for p in d.iterdir())
+    assert len(names) == 21 and all(n.endswith(".png") for n in names)   # no mockups or other files
+    for n in ('if Width <= 202', "'551x1055'"):
+        assert n in iss_text()
 
 
 def test_spec_onedir_icon_no_upx_no_ai():
