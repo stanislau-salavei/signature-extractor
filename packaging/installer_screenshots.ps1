@@ -55,15 +55,28 @@ function Save-Shot($w, [string]$name) {
     [Win]::SetForegroundWindow($h) | Out-Null
     $r = New-Object Win+RECT; [Win]::GetWindowRect($h, [ref]$r) | Out-Null
     $f = New-Object Win+RECT; [Win]::DwmGetWindowAttribute($h, 9, [ref]$f, 16) | Out-Null   # extended frame bounds
-    $bmp = New-Object System.Drawing.Bitmap ($r.Right - $r.Left), ($r.Bottom - $r.Top)
-    $g = [System.Drawing.Graphics]::FromImage($bmp); $hdc = $g.GetHdc()
-    [Win]::PrintWindow($h, $hdc, 2) | Out-Null                                              # PW_RENDERFULLCONTENT
-    $g.ReleaseHdc($hdc); $g.Dispose()
     $crop = New-Object System.Drawing.Rectangle ($f.Left - $r.Left), ($f.Top - $r.Top), ($f.Right - $f.Left), ($f.Bottom - $f.Top)
-    $out = $bmp.Clone($crop, $bmp.PixelFormat); $bmp.Dispose()
+    $out = $null
+    for ($try = 1; $try -le 5 -and -not $out; $try++) {
+        $bmp = New-Object System.Drawing.Bitmap ($r.Right - $r.Left), ($r.Bottom - $r.Top)
+        $g = [System.Drawing.Graphics]::FromImage($bmp); $g.Clear([System.Drawing.Color]::Magenta); $hdc = $g.GetHdc()
+        $ok = [Win]::PrintWindow($h, $hdc, 2)                                                # PW_RENDERFULLCONTENT
+        $g.ReleaseHdc($hdc); $g.Dispose()
+        $px = $bmp.GetPixel([int]($bmp.Width / 2), [int]($bmp.Height / 2))
+        if ($ok -and -not ($px.R -eq 255 -and $px.G -eq 0 -and $px.B -eq 255)) { $out = $bmp.Clone($crop, $bmp.PixelFormat) }
+        else { "  PrintWindow failed (try $try)"; Start-Sleep -Milliseconds 700 }
+        $bmp.Dispose()
+    }
+    if (-not $out) {                                                                         # the screen itself
+        $out = New-Object System.Drawing.Bitmap $crop.Width, $crop.Height
+        $g = [System.Drawing.Graphics]::FromImage($out)
+        $g.CopyFromScreen($f.Left, $f.Top, 0, 0, $out.Size); $g.Dispose()
+        "  captured from the screen"
+    }
     $path = Join-Path $OutDir "$name.png"
     $out.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
-    "{0}: {1}x{2}" -f $path, $out.Width, $out.Height
+    $texts = Get-Controls $w | Where-Object { $_.Text -like "TNewStaticText|*" } | Select-Object -First 2 | ForEach-Object { ($_.Text -split "\|", 2)[1] }
+    "{0}: {1}x{2}  [{3}]" -f $path, $out.Width, $out.Height, ($texts -join " / ")
     $out.Dispose()
 }
 

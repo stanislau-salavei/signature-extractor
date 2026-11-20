@@ -242,4 +242,6 @@ begin
   if ActiveLanguage = 'en' then
     UseEnglishWizardImage;
   LayOutWelcomePage;
+  { the Ready page summary on white, like the other pages (read-only memos are grey by default) }
+  WizardForm.ReadyMemo.Color := clWindow;
 end;
