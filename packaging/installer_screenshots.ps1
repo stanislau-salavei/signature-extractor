@@ -186,8 +186,22 @@ function Show-AppData([string]$tag) {
         "; exported signature: " + $(if (Test-Path (Join-Path $ExportDir "signature_ci.png")) { "kept" } else { "DELETED" })
 }
 
+# unins000.exe runs a copy of itself from the temp folder (_iu*.tmp in Inno 6; checked by path, not only by name)
+function Get-UninstProcesses {
+    Get-Process | Where-Object { $_.Name -like "_iu*" -or $_.Name -like "unins*" -or
+        ($_.Path -and $_.Path -like "*\Temp\*" -and $_.Path -like "*.tmp" -and $_.Path -notlike "*setup.tmp") }
+}
+
+function Show-TopWindows {
+    foreach ($w in $UIA::RootElement.FindAll($Tree::Children, [System.Windows.Automation.Condition]::TrueCondition)) {
+        $pr = Get-Process -Id $w.Current.ProcessId -ErrorAction SilentlyContinue
+        "  window: class=" + $w.Current.ClassName + " name='" + $w.Current.Name + "' process=" + $pr.Name + " " + $pr.Path
+    }
+    Get-Process | Where-Object { $_.Path -like "*\Temp\*" -or $_.Name -like "unins*" } | ForEach-Object { "  process: " + $_.Name + " " + $_.Path }
+}
+
 function Get-UninstWindows([string]$class) {
-    $ids = @(Get-Process | Where-Object { $_.Name -like "_iu*" -or $_.Name -like "unins*" } | ForEach-Object { $_.Id })
+    $ids = @(Get-UninstProcesses | ForEach-Object { $_.Id })
     $UIA::RootElement.FindAll($Tree::Children, [System.Windows.Automation.Condition]::TrueCondition) |
         Where-Object { $ids -contains $_.Current.ProcessId -and $_.Current.ClassName -like $class }
 }
@@ -199,6 +213,7 @@ function Wait-UninstWindow([string]$class, [int]$TimeoutS = 60) {
         if ($w) { return $w }
         Start-Sleep -Milliseconds 300
     }
+    Show-TopWindows
     throw "uninstall window $class not found"
 }
 
@@ -230,9 +245,9 @@ function Invoke-Uninstall([string]$lang, [bool]$untick) {
         }
         if ($d) { Save-Shot $d "${lang}_7_uninstall_done"; Click-Button $d @("OK") }
         $end = (Get-Date).AddSeconds(60)
-        while (@(Get-Process | Where-Object { $_.Name -like "_iu*" }).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
+        while (@(Get-UninstProcesses).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
     } finally {
-        Get-Process | Where-Object { $_.Name -like "_iu*" -or $_.Name -like "unins*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+        Get-UninstProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
     }
     "[$lang] uninstall entry after: " + $(if (Test-Path $UninstKey) { "still present" } else { "removed" })
 }
@@ -310,7 +325,7 @@ $exe = ((Get-ItemProperty -Path $UninstKey).UninstallString -replace '"', '')
 $q = Start-Process -FilePath $exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
 $q.WaitForExit(120000) | Out-Null
 $end = (Get-Date).AddSeconds(60)
-while (@(Get-Process | Where-Object { $_.Name -like "_iu*" }).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
+while (@(Get-UninstProcesses).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
 Show-AppData "silent uninstall"
 Check "silent uninstall keeps the settings" (Test-Path (Join-Path $DataDir "settings.json"))
 Check "silent uninstall removes the program" (-not (Test-Path $UninstKey))
