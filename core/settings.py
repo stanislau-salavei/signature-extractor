@@ -1,6 +1,7 @@
 """Settings file: %APPDATA%\\Signature Extractor\\settings.json (JSON, atomic write).
 
-The installer / uninstaller never touch this file.  A missing or damaged file is replaced
+The installer never touches this file; the uninstaller removes it only when «Удалить настройки» is ticked
+(remark 122).  A missing or damaged file is replaced
 by defaults.  ``name_template`` = None means «language default» («подпись_{имя}» / ``signature_{name}``);
 ``save_folder`` = None is replaced at the start by «Documents\\Подписи» / «Documents\\Signatures» in the language of
 that launch and then stays (remark 83).

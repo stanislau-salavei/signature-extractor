@@ -143,15 +143,50 @@ def test_iss_run_after_install_also_silent():
 
 
 def test_iss_running_app_and_settings_untouched():
+    """The installer and updates never touch the settings; only an interactive uninstall with «Remove settings»
+    ticked removes them (remark 122, see test_iss_uninstall_remove_settings)."""
     from ui import platform_win as PW
     s = iss_setup()
     t = iss_text()
     assert f'#define AppMutexName "{PW.INSTANCE_MUTEX}"' in t and s["AppMutex"] == "{#AppMutexName}"
     assert s["CloseApplications"] == "yes"
     assert "[UninstallDelete]" not in t
-    assert "{userappdata}" not in t and "{app}\\..\\" not in t
-    low = t.lower()
-    assert "settings.json" not in low.replace("; %appdata%\\signature extractor (settings.json, log) is never touched (no uninstall-delete entries)", "")
+    assert "{app}\\..\\" not in t
+    before_code = t.split("[Code]", 1)[0]
+    assert "{userappdata}" not in before_code
+    code = t.split("[Code]", 1)[1]
+    assert code.count("{userappdata}") == 1 and "settings.json" in code
+    assert "{userappdata}" in code.split("procedure RemoveAppData;", 1)[1].split("end;", 1)[0]
+
+
+def test_iss_uninstall_remove_settings():
+    """Remark 122: a «Remove settings» check box (ticked) before uninstalling; silent uninstalls never ask/remove."""
+    from core import logs as L
+    from core import settings as S
+    t = iss_text()
+    lines = t.splitlines()
+    for line in ("ru.RemoveSettings=Удалить настройки", "en.RemoveSettings=Remove settings",
+                 "ru.RemoveButton=Удалить", "en.RemoveButton=Remove"):
+        assert line in lines, line
+    assert any(l.startswith("ru.RemoveSettingsNote=") and "Сохранённые подписи не удаляются" in l for l in lines)
+    assert any(l.startswith("en.RemoveSettingsNote=") and "Saved signature files are not deleted" in l for l in lines)
+    code = t.split("[Code]", 1)[1]
+    init = code.split("function InitializeUninstall: Boolean;", 1)[1].split("\nend;", 1)[0]
+    assert "RemoveSettings := False;" in init and "if not UninstallSilent then" in init
+    assert "Check.Checked := True;" in code                                    # ticked by default
+    step = code.split("procedure CurUninstallStepChanged", 1)[1].split("\nend;", 1)[0]
+    assert "usPostUninstall" in step and "RemoveSettings and not UninstallSilent" in step
+    # the same names as the program uses
+    body = code.split("procedure RemoveAppData;", 1)[1].split("\nend;", 1)[0]
+    assert f"{{userappdata}}\\{S.APP_DIR_NAME}'" in body
+    assert "'\\settings.json'" in body and "settings_*.tmp" in body                  # core/settings.Settings.save
+    assert f"'\\{L.LOG_NAME}*'" in body                                              # log + .1 … .3 backups
+    assert "GetTempDir + 'SignatureExtractor-update'" in body                        # core/updater.update_dir
+    upd = (ROOT / "core" / "updater.py").read_text(encoding="utf-8")
+    assert '/ "SignatureExtractor-update"' in upd
+    # only these files: the folder goes only if empty, nothing else is deleted recursively there
+    assert "RemoveDir(Dir)" in body and "DelTree(Dir," not in body
+    assert body.count("DelTree(") == 3
 
 
 def test_iss_license_note_with_link_no_license_page():

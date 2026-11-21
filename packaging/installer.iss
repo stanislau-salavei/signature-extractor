@@ -125,6 +125,15 @@ en.AppComments=Turns a photo or scan of a signature into clean PNG, SVG and DXF 
 ru.AppComments=Делает из фото или скана подписи чистые файлы PNG, SVG и DXF.
 ; %1 = the link to the licence text
 en.LicenseNote=Signature Extractor is free software under the GNU GPL, version 3. Full text: %1 and the LICENSE file in the program folder.
+; remark 122: the uninstaller asks whether to remove the settings (ticked by default)
+en.RemoveSettingsIntro=Signature Extractor will be removed from this computer.
+en.RemoveSettings=Remove settings
+en.RemoveSettingsNote=Preferences, your own size templates and colours, the log. Saved signature files are not deleted.
+en.RemoveButton=Remove
+ru.RemoveSettingsIntro=Программа «Извлечение подписи» будет удалена с этого компьютера.
+ru.RemoveSettings=Удалить настройки
+ru.RemoveSettingsNote=Параметры, свои шаблоны размеров и цвета, журнал работы. Сохранённые подписи не удаляются.
+ru.RemoveButton=Удалить
 ru.LicenseNote=«Извлечение подписи» — свободная программа под лицензией GNU GPL версии 3. Полный текст: %1 и файл LICENSE в папке программы.
 
 [Tasks]
@@ -155,7 +164,8 @@ Name: "{autodesktop}\{cm:ShortcutName}"; Filename: "{app}\{#AppExe}"; Parameters
 ; also after a silent update (/SILENT from the app): no skipifsilent, the new version opens
 Filename: "{app}\{#AppExe}"; Parameters: "--installer-language {cm:LangArg}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall
 
-; %APPDATA%\Signature Extractor (settings.json, log) is never touched (no uninstall-delete entries)
+; %APPDATA%\Signature Extractor (settings.json, log) is removed only on request: the «Remove settings» check box of
+; an interactive uninstall ([Code], remark 122); updates and silent uninstalls never touch it (no uninstall-delete entries)
 
 [Code]
 var
@@ -247,4 +257,122 @@ begin
   LayOutWelcomePage;
   { the Ready page summary on white, like the other pages (read-only memos are grey by default) }
   WizardForm.ReadyMemo.Color := clWindow;
+end;
+
+{ ---------------------------------------------------------------- uninstall (remark 122) }
+var
+  RemoveSettings: Boolean;
+
+{ The options dialog before Uninstall's own «Are you sure?» question: «Remove settings», ticked by default.
+  Returns False if the user cancels. }
+function AskRemoveSettings(var Remove: Boolean): Boolean;
+var
+  Form: TSetupForm;
+  Intro, Note: TNewStaticText;
+  Check: TNewCheckBox;
+  Band: TPanel;
+  RemoveBtn, CancelBtn: TNewButton;
+  W, Margin: Integer;
+begin
+  Margin := ScaleX(20);
+  Form := CreateCustomForm(ScaleX(440), ScaleY(200), False, True);
+  try
+    Form.Caption := FmtMessage(SetupMessage(msgUninstallAppFullTitle), [ExpandConstant('{cm:AppName}')]);
+    Form.Color := clWindow;
+
+    Intro := TNewStaticText.Create(Form);
+    Intro.Parent := Form;
+    Intro.AutoSize := False;
+    Intro.WordWrap := True;
+    Intro.Left := Margin;
+    Intro.Top := ScaleY(20);
+    Intro.Width := Form.ClientWidth - 2 * Margin;
+    Intro.Caption := CustomMessage('RemoveSettingsIntro');
+    Intro.AdjustHeight;
+
+    Check := TNewCheckBox.Create(Form);
+    Check.Parent := Form;
+    Check.Left := Margin;
+    Check.Top := Intro.Top + Intro.Height + ScaleY(16);
+    Check.Width := Intro.Width;
+    Check.Height := ScaleY(17);
+    Check.Caption := CustomMessage('RemoveSettings');
+    Check.Checked := True;
+
+    Note := TNewStaticText.Create(Form);
+    Note.Parent := Form;
+    Note.AutoSize := False;
+    Note.WordWrap := True;
+    Note.Left := Margin + ScaleX(18);
+    Note.Top := Check.Top + Check.Height + ScaleY(3);
+    Note.Width := Intro.Width - ScaleX(18);
+    Note.Font.Color := $6D6D6D;
+    Note.Caption := CustomMessage('RemoveSettingsNote');
+    Note.AdjustHeight;
+
+    Band := TPanel.Create(Form);
+    Band.Parent := Form;
+    Band.BevelOuter := bvNone;
+    Band.Color := clBtnFace;
+    Band.Height := ScaleY(49);
+    Form.ClientHeight := Note.Top + Note.Height + ScaleY(22) + Band.Height;
+    Band.Align := alBottom;
+
+    RemoveBtn := TNewButton.Create(Form);
+    RemoveBtn.Parent := Band;
+    RemoveBtn.Caption := CustomMessage('RemoveButton');
+    RemoveBtn.ModalResult := mrOk;
+    RemoveBtn.Default := True;
+
+    CancelBtn := TNewButton.Create(Form);
+    CancelBtn.Parent := Band;
+    CancelBtn.Caption := SetupMessage(msgButtonCancel);
+    CancelBtn.ModalResult := mrCancel;
+    CancelBtn.Cancel := True;
+
+    W := Form.CalculateButtonWidth([RemoveBtn.Caption, CancelBtn.Caption]);
+    CancelBtn.SetBounds(Form.ClientWidth - ScaleX(12) - W, ScaleY(13), W, ScaleY(23));
+    RemoveBtn.SetBounds(CancelBtn.Left - ScaleX(8) - W, ScaleY(13), W, ScaleY(23));
+
+    Form.ActiveControl := RemoveBtn;
+    Result := Form.ShowModal = mrOk;
+    Remove := Result and Check.Checked;
+  finally
+    Form.Free;
+  end;
+end;
+
+function InitializeUninstall: Boolean;
+begin
+  RemoveSettings := False;
+  Result := True;
+  { /SILENT and /VERYSILENT: no question and the settings stay.  Updates never run the uninstaller: the new
+    version installs over the old one. }
+  if not UninstallSilent then
+    Result := AskRemoveSettings(RemoveSettings);
+end;
+
+{ All the program's data in the user profile (core/settings.py, core/logs.py, core/updater.py): settings.json
+  (preferences, own size templates and colours), its temporary copies, the log with its backups and downloaded
+  updates.  Only these files: anything else in the folder (e.g. signatures saved there by the user) stays, and the
+  folder itself is removed only when it is empty.  The folders with exported signatures are never touched. }
+procedure RemoveAppData;
+var
+  Dir: String;
+begin
+  Dir := ExpandConstant('{userappdata}\Signature Extractor');
+  DeleteFile(Dir + '\settings.json');
+  DelTree(Dir + '\settings_*.tmp', False, True, False);
+  DelTree(Dir + '\signature_extractor.log*', False, True, False);
+  if RemoveDir(Dir) then
+    Log('Removed ' + Dir)
+  else
+    Log('Kept ' + Dir + ' (other files or not present)');
+  DelTree(GetTempDir + 'SignatureExtractor-update', True, True, True);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if (CurUninstallStep = usPostUninstall) and RemoveSettings and not UninstallSilent then
+    RemoveAppData;
 end;
