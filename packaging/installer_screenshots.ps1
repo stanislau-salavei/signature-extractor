@@ -1,5 +1,6 @@
 ﻿# CI only (best effort): run the built installer in Russian and English on the Windows runner, capture every
-# wizard page as PNG and check the licence link of the Welcome page.  Installs into the runner's profile.
+# wizard page as PNG and check the licence link of the Welcome page; then the uninstaller (remark 122): its dialog,
+# «Remove settings» ticked (RU) and unticked (EN), a silent update and a silent uninstall keep the settings.  Installs into the runner's profile.
 #   powershell -File packaging/installer_screenshots.ps1 -Setup dist\SignatureExtractor-1.0.1-setup.exe -OutDir shots
 param([Parameter(Mandatory)] [string]$Setup, [Parameter(Mandatory)] [string]$OutDir)
 $ErrorActionPreference = "Stop"
@@ -161,6 +162,84 @@ function Stop-Setup {
     while (@(Get-Wizards).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
 }
 
+
+# ---------------------------------------------------------------- uninstall (remark 122)
+$DataDir = Join-Path $env:APPDATA "Signature Extractor"
+$UpdDir = Join-Path ([System.IO.Path]::GetTempPath()) "SignatureExtractor-update"
+$ExportDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Signatures"
+$UninstKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{A610AA29-D7B2-4BD1-8564-F1469C0509C5}_is1"
+
+function New-AppData {
+    New-Item -ItemType Directory -Force -Path $DataDir, $UpdDir, $ExportDir | Out-Null
+    '{"language": "system", "custom_sizes": [{"w": 40, "h": 15}], "custom_colors": ["#123456"]}' |
+        Set-Content -Path (Join-Path $DataDir "settings.json") -Encoding UTF8
+    "log" | Set-Content (Join-Path $DataDir "signature_extractor.log")
+    "old log" | Set-Content (Join-Path $DataDir "signature_extractor.log.1")
+    "partial" | Set-Content (Join-Path $UpdDir "SignatureExtractor-9.9-setup.exe.part")
+    "png" | Set-Content (Join-Path $ExportDir "signature_ci.png")             # an exported signature
+}
+
+function Show-AppData([string]$tag) {
+    $files = @(Get-ChildItem $DataDir -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+    "[$tag] data folder: " + $(if (Test-Path $DataDir) { "present (" + ($files -join ", ") + ")" } else { "REMOVED" }) +
+        "; update folder: " + $(if (Test-Path $UpdDir) { "present" } else { "REMOVED" }) +
+        "; exported signature: " + $(if (Test-Path (Join-Path $ExportDir "signature_ci.png")) { "kept" } else { "DELETED" })
+}
+
+function Get-UninstWindows([string]$class) {
+    $ids = @(Get-Process | Where-Object { $_.Name -like "_iu*" -or $_.Name -like "unins*" } | ForEach-Object { $_.Id })
+    $UIA::RootElement.FindAll($Tree::Children, [System.Windows.Automation.Condition]::TrueCondition) |
+        Where-Object { $ids -contains $_.Current.ProcessId -and $_.Current.ClassName -like $class }
+}
+
+function Wait-UninstWindow([string]$class, [int]$TimeoutS = 60) {
+    $end = (Get-Date).AddSeconds($TimeoutS)
+    while ((Get-Date) -lt $end) {
+        $w = Get-UninstWindows $class | Select-Object -First 1
+        if ($w) { return $w }
+        Start-Sleep -Milliseconds 300
+    }
+    throw "uninstall window $class not found"
+}
+
+function Invoke-Uninstall([string]$lang, [bool]$untick) {
+    $u = Get-ItemProperty -Path $UninstKey
+    $exe = ($u.UninstallString -replace '"', '')
+    $names = @{ ru = "Удалить"; en = "Remove" }
+    $p = Start-Process -FilePath $exe -PassThru
+    try {
+        $w = Wait-UninstWindow "TSetupForm*"
+        "[$lang] uninstall dialog: " + $w.Current.Name
+        Get-Controls $w | ForEach-Object { "[$lang]   control: " + $_.Text }
+        Save-Shot $w "${lang}_5_uninstall"
+        if ($untick) {
+            $cb = Get-Controls $w | Where-Object { $_.Text -like "TNewCheckBox|*" } | Select-Object -First 1
+            [Win]::SendMessage($cb.Handle, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null    # BM_CLICK
+            $state = [Win]::SendMessage($cb.Handle, 0x00F0, [IntPtr]::Zero, [IntPtr]::Zero)      # BM_GETCHECK
+            "[$lang] check box after click: " + $state
+            Save-Shot $w "${lang}_5b_uninstall_unticked"
+        }
+        Click-Button $w @($names[$lang])
+        $c = Wait-UninstWindow "#32770"
+        Save-Shot $c "${lang}_6_uninstall_confirm"
+        Click-Button $c @("Да", "Yes")
+        $d = $null; $end = (Get-Date).AddSeconds(120)
+        while (-not $d -and (Get-Date) -lt $end) {
+            $d = Get-UninstWindows "#32770" | Where-Object { Find-Button $_ @("OK") } | Select-Object -First 1
+            Start-Sleep -Milliseconds 500
+        }
+        if ($d) { Save-Shot $d "${lang}_7_uninstall_done"; Click-Button $d @("OK") }
+        $end = (Get-Date).AddSeconds(60)
+        while (@(Get-Process | Where-Object { $_.Name -like "_iu*" }).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
+    } finally {
+        Get-Process | Where-Object { $_.Name -like "_iu*" -or $_.Name -like "unins*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    "[$lang] uninstall entry after: " + $(if (Test-Path $UninstKey) { "still present" } else { "removed" })
+}
+
+$Checks = @()
+function Check([string]$what, [bool]$ok) { $script:Checks += ("{0}: {1}" -f $(if ($ok) { "PASS" } else { "FAIL" }), $what) }
+
 $ButtonNames = @{
     ru = @{ Next = "Далее"; Install = "Установить"; Finish = "Завершить" }
     en = @{ Next = "Next"; Install = "Install"; Finish = "Finish" }
@@ -200,4 +279,41 @@ foreach ($lang in "ru", "en") {
     $menu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
     Get-ChildItem $menu -Filter *.lnk | Where-Object { $_.Name -match "Signature|подписи" } |
         ForEach-Object { "[$lang] Start menu shortcut: " + $_.Name }
+
+    New-AppData
+    if ($lang -eq "en") {
+        # an update installs over the old version silently: the settings stay
+        $q = Start-Process -FilePath $Setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=en" -PassThru
+        $q.WaitForExit(240000) | Out-Null
+        Stop-Setup
+        Show-AppData "en, after a silent update"
+        Check "silent update keeps the settings" (Test-Path (Join-Path $DataDir "settings.json"))
+    }
+    $untick = $lang -eq "en"
+    Invoke-Uninstall $lang $untick
+    Show-AppData ("$lang, after uninstall (Remove settings " + $(if ($untick) { "unticked" } else { "ticked" }) + ")")
+    Check "$lang uninstall: exported signature kept" (Test-Path (Join-Path $ExportDir "signature_ci.png"))
+    if ($untick) {
+        Check "en unticked keeps settings.json and the log" ((Test-Path (Join-Path $DataDir "settings.json")) -and (Test-Path (Join-Path $DataDir "signature_extractor.log")))
+    } else {
+        Check "ru ticked removes the data folder" (-not (Test-Path $DataDir))
+        Check "ru ticked removes downloaded updates" (-not (Test-Path $UpdDir))
+    }
 }
+
+# silent uninstall: no dialog, the settings stay
+$q = Start-Process -FilePath $Setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=ru" -PassThru
+$q.WaitForExit(240000) | Out-Null
+Stop-Setup
+New-AppData
+$exe = ((Get-ItemProperty -Path $UninstKey).UninstallString -replace '"', '')
+$q = Start-Process -FilePath $exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
+$q.WaitForExit(120000) | Out-Null
+$end = (Get-Date).AddSeconds(60)
+while (@(Get-Process | Where-Object { $_.Name -like "_iu*" }).Count -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
+Show-AppData "silent uninstall"
+Check "silent uninstall keeps the settings" (Test-Path (Join-Path $DataDir "settings.json"))
+Check "silent uninstall removes the program" (-not (Test-Path $UninstKey))
+
+$Checks | ForEach-Object { "CHECK " + $_ }
+if ($Checks -match "^FAIL") { throw "uninstall checks failed" }
